@@ -1,0 +1,2871 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistem Absensi Digital Terpadu - SMP Negeri 1 Tempuran</title>
+  <style>
+    :root {
+      --primary: #0f2557;
+      --primary-dark: #060f26;
+      --primary-light: #eff6ff;
+      --secondary: #1d4ed8;
+      --accent: #fbbf24;
+      --accent-dark: #f59e0b;
+      --purple: #6d28d9;
+      --purple-light: #f3e8ff;
+      --success: #059669;
+      --success-bg: #d1fae5;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --danger: #e11d48;
+      --danger-bg: #ffe4e6;
+      --info: #1d4ed8;
+      --info-bg: #dbeafe;
+      --bg: #eef2f6;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+      --radius: 14px;
+      --shadow: 0 4px 16px rgba(7, 19, 48, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .hidden { display: none !important; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    /* HEADER NAVY GELAP DENGAN AKSEN GOLD */
+    .app-header {
+      background: linear-gradient(135deg, #060f26 0%, #0b1d47 65%, #102a63 100%);
+      color: #ffffff;
+      padding: 0.9rem 1.25rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 3px solid var(--accent);
+      box-shadow: 0 4px 18px rgba(6, 15, 38, 0.25);
+    }
+
+    .header-inner {
+      max-width: 1240px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .brand { display: flex; align-items: center; gap: 0.85rem; }
+
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+      color: #060f26;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(251, 191, 36, 0.35);
+      border: 1px solid #fef08a;
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 1.05rem;
+      font-weight: 900;
+      letter-spacing: 0.01em;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+
+    .brand-text p { font-size: 0.78rem; color: #cbd5e1; }
+
+    .header-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+    .role-pill {
+      padding: 0.35rem 0.82rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+    .pill-guest { background: rgba(251, 191, 36, 0.16); color: #fde047; border: 1px solid rgba(251, 191, 36, 0.4); }
+    .pill-teacher { background: #dbeafe; color: #1e3a8a; }
+    .pill-homeroom { background: #f3e8ff; color: #6d28d9; }
+    .pill-admin { background: #e11d48; color: #ffffff; }
+
+    .container { max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.85rem; }
+
+    @media (max-width: 860px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* HERO BANNER ROYAL BLUE */
+    .hero-card {
+      background: linear-gradient(135deg, #0b1d47 0%, #1e3a8a 55%, #1d4ed8 100%);
+      color: #ffffff;
+      border-radius: var(--radius);
+      padding: 1.35rem 1.5rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 3px solid var(--accent);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card h2 { font-size: 1.3rem; font-weight: 900; margin-bottom: 0.3rem; color: #ffffff; }
+    .hero-card p { font-size: 0.86rem; color: #dbeafe; max-width: 820px; }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1.2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1.5px solid #e2e8f0;
+    }
+
+    .card-header h3 { font-size: 1rem; font-weight: 800; color: #0b1d47; }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: 3px solid #1e3a8a;
+      border-radius: var(--radius);
+      padding: 0.95rem;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-label { font-size: 0.76rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.2rem; }
+    .stat-value { font-size: 1.5rem; font-weight: 900; color: #0b1d47; }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.38rem;
+      padding: 0.56rem 1rem;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      font-weight: 800;
+      font-size: 0.84rem;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-sm { padding: 0.4rem 0.74rem; font-size: 0.78rem; border-radius: 8px; }
+    .btn-xs { padding: 0.28rem 0.56rem; font-size: 0.74rem; border-radius: 7px; }
+
+    .btn-primary { background: #0b1d47; color: #ffffff; box-shadow: 0 3px 8px rgba(11, 29, 71, 0.26); }
+    .btn-primary:hover:not(:disabled) { background: #1e3a8a; }
+
+    #btnOpenLogin {
+      background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+      color: #060f26;
+      border-color: #fef08a;
+      box-shadow: 0 3px 10px rgba(245, 158, 11, 0.35);
+    }
+
+    .btn-success { background: var(--success); color: #ffffff; }
+    .btn-success:hover:not(:disabled) { background: #047857; }
+
+    .btn-warning { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #060f26; }
+    .btn-warning:hover:not(:disabled) { background: #d97706; color: #ffffff; }
+
+    .btn-danger { background: var(--danger); color: #ffffff; }
+    .btn-danger:hover:not(:disabled) { background: #be123c; }
+
+    .btn-info { background: var(--info); color: #ffffff; }
+    .btn-info:hover:not(:disabled) { background: #1e40af; }
+
+    .btn-purple { background: var(--purple); color: #ffffff; }
+    .btn-outline { background: #ffffff; color: #0b1d47; border-color: #cbd5e1; }
+    .btn-outline:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.24rem 0.62rem;
+      border-radius: 999px;
+      font-size: 0.73rem;
+      font-weight: 800;
+    }
+    .badge-teal { background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }
+    .badge-success { background: var(--success-bg); color: var(--success); border: 1px solid #6ee7b7; }
+    .badge-warning { background: var(--warning-bg); color: #92400e; border: 1px solid #fcd34d; }
+    .badge-danger { background: var(--danger-bg); color: var(--danger); border: 1px solid #fda4af; }
+    .badge-info { background: var(--info-bg); color: #1e40af; border: 1px solid #93c5fd; }
+    .badge-purple { background: var(--purple-light); color: var(--purple); border: 1px solid #d8b4fe; }
+    .badge-gold { background: #fef08a; color: #060f26; border: 1px solid #facc15; }
+
+    /* FORMS */
+    .form-group { margin-bottom: 0.85rem; }
+    .form-group label { display: block; font-size: 0.82rem; font-weight: 800; margin-bottom: 0.32rem; color: #0b1d47; }
+    .form-control {
+      width: 100%;
+      padding: 0.56rem 0.8rem;
+      border-radius: 10px;
+      border: 1.5px solid #cbd5e1;
+      background: #ffffff;
+      color: var(--text);
+      font-size: 0.86rem;
+      font-family: inherit;
+    }
+    .form-control:focus { outline: none; border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12); }
+
+    /* TABS BAR NAVY GELAP DENGAN GARIS BAWAH GOLD */
+    .tab-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      background: #0b1d47;
+      padding: 0.45rem 0.55rem 0;
+      border-radius: 12px;
+      border: 1px solid #1e3a8a;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.15rem;
+    }
+
+    .tab-btn {
+      padding: 0.62rem 1rem;
+      border-radius: 9px 9px 0 0;
+      border: none;
+      border-bottom: 3px solid transparent;
+      background: transparent;
+      color: #cbd5e1;
+      font-weight: 700;
+      font-size: 0.84rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.38rem;
+    }
+    .tab-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.08); }
+    .tab-btn.active, .tab-btn.active-amber {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fde047;
+      border-bottom: 3px solid #fbbf24;
+    }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+    th {
+      background: #f1f5f9;
+      color: #0b1d47;
+      font-weight: 800;
+      text-align: left;
+      padding: 0.68rem 0.8rem;
+      border-bottom: 1.5px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 0.65rem 0.8rem; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+
+    /* SCANNER VIEWPORT */
+    .scanner-box {
+      position: relative;
+      background: #060f26;
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: 230px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #1e3a8a;
+    }
+    .scanner-box video { width: 100%; max-height: 280px; object-fit: cover; display: block; }
+    .scanner-overlay {
+      position: absolute;
+      inset: 16%;
+      border: 2.5px dashed #fbbf24;
+      border-radius: 12px;
+      pointer-events: none;
+    }
+
+    /* KARTU QR ID RESMI SMPN 1 TEMPURAN */
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 1rem;
+    }
+    .id-card {
+      background: #f8fafc;
+      border: 2px solid #0a1931;
+      border-radius: 14px;
+      padding: 0.9rem 0.85rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 3px 10px rgba(10, 25, 49, 0.1);
+      page-break-inside: avoid;
+    }
+    .id-card-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #0a1931;
+      margin-bottom: 0.65rem;
+    }
+    .id-card-logo {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .id-card-school h4 {
+      font-size: 0.86rem;
+      font-weight: 900;
+      color: #0a1931;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+    .id-card-school p {
+      font-size: 0.62rem;
+      font-style: italic;
+      color: #334155;
+      margin-top: 2px;
+    }
+    .id-card-qr {
+      width: 148px;
+      height: 148px;
+      background: #ffffff;
+      padding: 6px;
+      border-radius: 8px;
+      margin-bottom: 0.6rem;
+    }
+    .id-card-meta {
+      width: 100%;
+      font-size: 0.73rem;
+      color: #0a1931;
+      line-height: 1.38;
+      margin-bottom: 0.55rem;
+    }
+    .id-card-meta div { display: flex; }
+    .id-card-meta span.lbl { width: 46px; flex-shrink: 0; font-weight: 600; }
+    .id-card-meta span.val { font-weight: 800; }
+    .id-card-footer {
+      width: 100%;
+      text-align: center;
+      font-size: 0.58rem;
+      font-weight: 700;
+      color: #334155;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 0.35rem;
+    }
+
+    /* MODAL */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 15, 38, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 100;
+    }
+    .modal-card {
+      background: #ffffff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 470px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 20px 40px rgba(6, 15, 38, 0.32);
+      overflow: hidden;
+    }
+    .modal-head {
+      background: #0b1d47;
+      color: #ffffff;
+      padding: 0.95rem 1.2rem;
+      border-bottom: 2.5px solid #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-head h3 { font-size: 1rem; font-weight: 800; }
+    .modal-body { padding: 1.2rem; max-height: 82vh; overflow-y: auto; }
+
+    /* TOAST */
+    .toast-wrap {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      z-index: 120;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 340px;
+    }
+    .toast {
+      background: #0b1d47;
+      color: #ffffff;
+      border-left: 4px solid #fbbf24;
+      padding: 0.72rem 0.95rem;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(6, 15, 38, 0.25);
+      font-size: 0.8rem;
+    }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #f43f5e; }
+
+    @media print {
+      .app-header, .tab-nav, .no-print, .toast-wrap { display: none !important; }
+      body { background: #ffffff; }
+      .container { max-width: 100%; padding: 0; }
+      .card { border: none; box-shadow: none; padding: 0; }
+      .qr-grid { grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER UTAMA -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-logo">QR</div>
+        <div class="brand-text">
+          <h1>SMP Negeri 1 Tempuran</h1>
+          <p id="headerSubtitle">Sistem Absensi Digital Terpadu • Mode Publik &amp; Siswa</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <span id="roleBadge" class="role-pill pill-guest">Mode Publik / Siswa</span>
+        <button type="button" id="btnOpenLogin" class="btn btn-sm" onclick="openLoginModal()">🔐 Login Guru / Wali / Admin</button>
+        <button type="button" id="btnLogout" class="btn btn-danger btn-sm hidden" onclick="logoutRole()">🚪 Keluar</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- ===================================================================
+         1. PORTAL PUBLIK (ABSEN PAGI NON-MAPEL & IZIN FOTO WAJAH + SURAT)
+         =================================================================== -->
+    <div id="publicPortalView">
+      <div class="hero-card">
+        <span class="badge badge-gold" style="margin-bottom:0.45rem;">☀️ PORTAL PUBLIK SEKOLAH (TANPA LOGIN)</span>
+        <h2>Absensi Pagi &amp; Pengajuan Izin Mandiri Siswa</h2>
+        <p>Scan Kartu QR kehadiran pagi sebelum jam pelajaran dimulai atau ajukan izin/sakit dengan foto wajah siswa memegang surat izin.</p>
+      </div>
+
+      <div class="tab-nav">
+        <button type="button" id="pubTabPagi" class="tab-btn active" onclick="switchPublicTab('pagi')">☀️ Absen Pagi (Non-Mapel)</button>
+        <button type="button" id="pubTabIzin" class="tab-btn" onclick="switchPublicTab('izin')">📸 Portal Izin / Sakit (Foto Wajah + Surat)</button>
+      </div>
+
+      <!-- SUB-TAB PUBLIK A: ABSEN PAGI -->
+      <section id="publicPagiSection" class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3>📷 Scan QR / Input Kode Absen Pagi</h3>
+            <input type="date" id="pagiDateInput" class="form-control" style="width:auto;" onchange="refreshPagiUI()" />
+          </div>
+
+          <div class="scanner-box" style="margin-bottom:0.85rem;">
+            <video id="pagiVideo" class="hidden" playsinline muted></video>
+            <div id="pagiOverlay" class="scanner-overlay hidden"></div>
+            <p id="pagiCamPlaceholder" style="color:#cbd5e1; font-size:0.82rem; text-align:center; padding:1rem;">
+              Kamera pemindai belum aktif.<br/>Klik tombol di bawah atau ketik Kode QR / NISN siswa.
+            </p>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-bottom:0.85rem; flex-wrap:wrap;">
+            <button type="button" id="btnStartPagiCam" class="btn btn-primary" onclick="startQrCamera('pagi')">📷 Mulai Scan Kamera</button>
+            <button type="button" id="btnStopPagiCam" class="btn btn-danger hidden" onclick="stopAllCameras()">⏹ Matikan Kamera</button>
+          </div>
+
+          <form onsubmit="handlePagiManualSubmit(event)" style="display:flex; gap:0.5rem;">
+            <input type="text" id="pagiCodeInput" class="form-control mono" placeholder="Ketik Kode QR / NISN / Nama siswa..." style="text-transform:uppercase;" />
+            <button type="submit" class="btn btn-success">Hadir Pagi</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Daftar Kehadiran Pagi per Kelas</h3>
+            <select id="pagiClassSelect" class="form-control" style="width:auto; font-weight:700;" onchange="refreshPagiUI()"></select>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem;">
+            <span id="pagiSummaryBadge" class="badge badge-teal">Hadir: 0 Siswa</span>
+            <span style="font-size:0.75rem; color:var(--text-muted);">Otomatis masuk ke laporan Wali Kelas &amp; Guru BK</span>
+          </div>
+          <div class="table-wrap" style="max-height:360px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Siswa &amp; Kode</th>
+                  <th>Status</th>
+                  <th>Tandai Cepat</th>
+                </tr>
+              </thead>
+              <tbody id="pagiTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SUB-TAB PUBLIK B: PORTAL IZIN FOTO LANGSUNG WAJAH + SURAT -->
+      <section id="publicIzinSection" class="hidden">
+        <div class="card" style="max-width:660px; margin:0 auto;">
+          <div class="card-header">
+            <h3>📸 Form Pengajuan Sakit / Izin (Wajib Foto Wajah + Surat)</h3>
+            <span class="badge badge-warning">Kamera Langsung</span>
+          </div>
+
+          <form onsubmit="submitPublicIzin(event)">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div class="form-group">
+                <label for="izinClassSelect">1. Pilih Kelas *</label>
+                <select id="izinClassSelect" class="form-control" onchange="populateIzinStudentsByClass()"></select>
+              </div>
+              <div class="form-group">
+                <label for="izinStudentSelect">2. Pilih Nama Siswa *</label>
+                <select id="izinStudentSelect" class="form-control" required></select>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+              <div class="form-group">
+                <label for="izinDateInput">3. Tanggal Tidak Hadir *</label>
+                <input type="date" id="izinDateInput" class="form-control" required />
+              </div>
+              <div class="form-group">
+                <label for="izinTypeSelect">4. Jenis Ketidakhadiran *</label>
+                <select id="izinTypeSelect" class="form-control">
+                  <option value="Sakit">🤒 Sakit</option>
+                  <option value="Izin Penting">📩 Izin Alasan Penting</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="izinReasonInput">5. Keterangan / Alasan Lengkap *</label>
+              <textarea id="izinReasonInput" rows="2" class="form-control" placeholder="Tuliskan alasan sakit atau izin secara jelas..." required></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>6. Foto Langsung Wajah Siswa Memegang Surat Izin / Dokter *</label>
+              <div style="background:#f8fafc; border:1.5px dashed #94a3b8; border-radius:12px; padding:0.85rem; text-align:center;">
+                <div id="izinCamBox" class="scanner-box hidden" style="margin-bottom:0.75rem;">
+                  <video id="izinVideo" playsinline muted style="transform:scaleX(-1);"></video>
+                  <div style="position:absolute; inset:10%; border:2px dashed #fbbf24; border-radius:12px; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between; padding:6px;">
+                    <span style="background:rgba(6,15,38,0.75); color:#fde047; font-size:0.68rem; padding:2px 6px; border-radius:6px; align-self:center;">Posisikan Wajah Siswa di Atas</span>
+                    <span style="background:rgba(6,15,38,0.75); color:#fde047; font-size:0.68rem; padding:2px 6px; border-radius:6px; align-self:center;">Pegang Surat Izin Jelas di Bawah</span>
+                  </div>
+                </div>
+
+                <img id="izinCapturedPreview" class="hidden" alt="Hasil Foto Wajah dan Surat" style="max-width:100%; max-height:240px; border-radius:10px; border:2px solid #059669; margin-bottom:0.65rem;" />
+                <p id="izinPhotoStatus" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.65rem;">
+                  Mode upload file dinonaktifkan. Gunakan kamera langsung agar wajah siswa dan surat terlihat jelas.
+                </p>
+
+                <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap;">
+                  <button type="button" id="btnOpenIzinCam" class="btn btn-primary btn-sm" onclick="startIzinCamera()">📷 Buka Kamera Foto</button>
+                  <button type="button" id="btnSwitchIzinCam" class="btn btn-outline btn-sm hidden" onclick="switchIzinFacingMode()">🔄 Ganti Kamera</button>
+                  <button type="button" id="btnSnapIzinPhoto" class="btn btn-warning btn-sm hidden" onclick="captureIzinPhoto()">📸 Jepret Foto Sekarang</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label style="display:flex; align-items:center; gap:0.45rem; font-weight:600; cursor:pointer;">
+                <input type="checkbox" id="izinConfirmCheck" required />
+                <span>Saya menyatakan foto menunjukkan wajah siswa yang bersangkutan dengan memegang surat izin asli.</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%; padding:0.72rem;">📤 Kirim Pengajuan Izin Sekarang</button>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================================================================
+         2. WORKSPACE GURU MAPEL / EKSKUL / GURU AGAMA / ADMIN SEKOLAH
+         =================================================================== -->
+    <div id="teacherWorkspaceView" class="hidden">
+      <div class="card" style="margin-bottom:1rem; background:#0b1d47; color:#ffffff; border-bottom:3px solid #fbbf24;">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.75rem;">
+          <div>
+            <span id="wsRoleBadge" class="badge badge-gold">GURU MATA PELAJARAN</span>
+            <h2 id="wsRoomTitle" style="font-size:1.2rem; font-weight:900; margin-top:0.25rem;">Matematika</h2>
+            <p id="wsRoomSub" style="font-size:0.8rem; color:#cbd5e1;">Pengampu: Guru Matematika</p>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+            <select id="adminRoomSwitcher" class="form-control hidden" style="width:auto; font-weight:800;" onchange="handleAdminSwitchRoom()"></select>
+            <select id="wsClassFilter" class="form-control" style="width:auto; font-weight:800;" onchange="handleWsClassFilterChange()"></select>
+            <input type="date" id="wsDateInput" class="form-control" style="width:auto;" onchange="refreshWorkspaceUI()" />
+            <button type="button" id="btnSyncMasterClass" class="btn btn-warning btn-sm" onclick="syncCurrentClassFromMaster()">🔄 Tarik Siswa Kelas Induk</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-nav">
+        <button type="button" id="wsTabBtnScan" class="tab-btn active" onclick="switchWsTab('scan')">📷 Scan QR &amp; Absen Cepat</button>
+        <button type="button" id="wsTabBtnSholat" class="tab-btn hidden" onclick="switchWsTab('sholat')">🕌 Absen Sholat</button>
+        <button type="button" id="wsTabBtnAgamaRekap" class="tab-btn hidden" onclick="switchWsTab('agamaRekap')">📊 Rekap Sholat Lintas Kelas</button>
+        <button type="button" id="wsTabBtnRekap" class="tab-btn" onclick="switchWsTab('rekap')">📋 Rekap, Siswa &amp; Verifikasi Izin</button>
+        <button type="button" id="wsTabBtnKartu" class="tab-btn" onclick="switchWsTab('kartu')">🪪 Kartu QR Siswa</button>
+        <button type="button" id="wsTabBtnAdmin" class="tab-btn hidden" onclick="switchWsTab('admin')">🛡️ Pengaturan Admin &amp; Bank Kelas</button>
+      </div>
+
+      <!-- WS TAB 1: SCAN QR & ABSEN CEPAT -->
+      <section id="wsTabScan" class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3>📷 Pemindai QR Kehadiran Kelas</h3>
+            <span id="wsActiveGroupBadge" class="badge badge-teal">VIIA</span>
+          </div>
+          <div class="scanner-box" style="margin-bottom:0.85rem;">
+            <video id="wsVideo" class="hidden" playsinline muted></video>
+            <div id="wsOverlay" class="scanner-overlay hidden"></div>
+            <p id="wsCamPlaceholder" style="color:#cbd5e1; font-size:0.82rem; text-align:center; padding:1rem;">
+              Kamera pemindai belum aktif.<br/>Klik tombol di bawah atau ketik Kode QR / Nama siswa.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.5rem; margin-bottom:0.85rem; flex-wrap:wrap;">
+            <button type="button" id="btnStartWsCam" class="btn btn-primary" onclick="startQrCamera('ws')">📷 Mulai Scan Kamera</button>
+            <button type="button" id="btnStopWsCam" class="btn btn-danger hidden" onclick="stopAllCameras()">⏹ Matikan Kamera</button>
+          </div>
+          <form onsubmit="handleWsManualScan(event)" style="display:flex; gap:0.5rem;">
+            <input type="text" id="wsManualCodeInput" class="form-control mono" placeholder="Ketik kode kartu atau nama siswa..." style="text-transform:uppercase;" />
+            <button type="submit" class="btn btn-success">Hadir</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>⚡ Daftar Presensi Kelas Aktif</h3>
+            <button type="button" class="btn btn-success btn-sm" onclick="markAllWsPresent()">✅ Hadirkan Semua</button>
+          </div>
+          <div class="table-wrap" style="max-height:390px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Siswa &amp; Kode</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="wsQuickTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WS TAB 2: ABSEN SHOLAT (KHUSUS GURU AGAMA & ADMIN) -->
+      <section id="wsTabSholat" class="hidden grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3>🕌 Pemindai QR Absen Sholat</h3>
+            <select id="wsSholatType" class="form-control" style="width:auto; font-weight:800;" onchange="renderWsSholatTable()">
+              <option value="Dzuhur">🕌 Sholat Dzuhur</option>
+              <option value="Dhuha">🌅 Sholat Dhuha</option>
+            </select>
+          </div>
+
+          <div class="scanner-box" style="margin-bottom:0.85rem;">
+            <video id="sholatVideo" class="hidden" playsinline muted></video>
+            <div id="sholatOverlay" class="scanner-overlay hidden"></div>
+            <p id="sholatCamPlaceholder" style="color:#cbd5e1; font-size:0.82rem; text-align:center; padding:1rem;">
+              Kamera pemindai QR Sholat belum aktif.<br/>Klik tombol di bawah atau ketik Kode QR / NISN / Nama siswa.
+            </p>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-bottom:0.85rem; flex-wrap:wrap;">
+            <button type="button" id="btnStartSholatCam" class="btn btn-primary" onclick="startQrCamera('sholat')">📷 Mulai Scan Sholat</button>
+            <button type="button" id="btnStopSholatCam" class="btn btn-danger hidden" onclick="stopAllCameras()">⏹ Matikan Kamera</button>
+          </div>
+
+          <form onsubmit="handleWsSholatManualScan(event)" style="display:flex; gap:0.5rem;">
+            <input type="text" id="wsSholatCodeInput" class="form-control mono" placeholder="Ketik Kode QR / NISN / Nama siswa..." style="text-transform:uppercase;" />
+            <button type="submit" class="btn btn-success">🕌 Jamaah</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Daftar Absen Sholat Kelas Aktif</h3>
+            <div style="display:flex; gap:0.4rem;">
+              <button type="button" class="btn btn-success btn-sm" onclick="markAllWsSholatJamaah()">✅ Jamaah Semua</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="exportWsSholatCSV()">📥 CSV</button>
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:390px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Siswa &amp; Kode</th>
+                  <th>Status Sholat</th>
+                  <th>Tandai</th>
+                </tr>
+              </thead>
+              <tbody id="wsSholatTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WS TAB 3: REKAP SHOLAT LINTAS KELAS (KHUSUS GURU AGAMA & ADMIN) -->
+      <section id="wsTabAgamaRekap" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>📊 Rekap Absen Sholat Berjamaah Lintas Kelas (VIIA–IXG)</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Gabungan catatan Sholat Dzuhur &amp; Dhuha dari Guru Wali dan Guru Agama.</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <select id="agamaSholatClassSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderAgamaSholatRekap()"></select>
+              <button type="button" class="btn btn-success btn-sm" onclick="exportAgamaSholatCSV()">📥 Export CSV Sholat</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>NISN / Kode</th>
+                  <th>Nama Siswa</th>
+                  <th>🕌 Sholat Dzuhur</th>
+                  <th>🌅 Sholat Dhuha</th>
+                </tr>
+              </thead>
+              <tbody id="agamaSholatTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WS TAB 4: REKAP MAPEL, KELOLA SISWA & VERIFIKASI IZIN -->
+      <section id="wsTabRekap" class="hidden">
+        <div class="stats-grid" id="wsStatsGrid" style="margin-bottom:1rem;"></div>
+
+        <div class="card" style="margin-bottom:1rem;">
+          <div class="card-header">
+            <h3>📩 Verifikasi Pengajuan Izin / Sakit Siswa</h3>
+            <span id="wsPendingIzinBadge" class="badge badge-warning">0 Menunggu</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Siswa &amp; Kelas</th>
+                  <th>Jenis &amp; Alasan</th>
+                  <th>Foto Wajah + Surat</th>
+                  <th>Status &amp; Verifikasi</th>
+                </tr>
+              </thead>
+              <tbody id="wsIzinTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Rekap Kehadiran &amp; Manajemen Siswa Ruang Ini</h3>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="openAddStudentModal()">+ Tambah Siswa</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="downloadImportTemplateCSV()">⬇️ Template CSV</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('roomCsvUpload').click()">⬆️ Import CSV</button>
+              <input type="file" id="roomCsvUpload" accept=".csv,.txt" class="hidden" onchange="importRoomStudentsCSV(event)" />
+              <button type="button" class="btn btn-success btn-sm" onclick="exportRoomAttendanceCSV()">📥 Export Rekap CSV</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Kode QR &amp; NISN</th>
+                  <th>Nama Siswa</th>
+                  <th>Kelas / Sesi</th>
+                  <th>Status Hari Ini</th>
+                  <th>Kelola</th>
+                </tr>
+              </thead>
+              <tbody id="rekapStudentTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WS TAB 5: KARTU QR ID RESMI SMPN 1 TEMPURAN -->
+      <section id="wsTabKartu" class="hidden">
+        <div class="card">
+          <div class="card-header no-print">
+            <div>
+              <h3>🪪 Cetak Kartu Absensi Resmi SMP Negeri 1 Tempuran</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Format ID Card resmi lengkap dengan logo sekolah, QR Code navy, Nama, Kelas, NISN, dan Kode Kartu.</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('schoolLogoUpload').click()">🖼️ Ganti Logo Sekolah</button>
+              <input type="file" id="schoolLogoUpload" accept="image/*" class="hidden" onchange="handleSchoolLogoUpload(event)" />
+              <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Cetak Kartu / PDF</button>
+            </div>
+          </div>
+          <div id="qrCardsGrid" class="qr-grid"></div>
+        </div>
+      </section>
+
+      <!-- WS TAB 6: ADMIN SEKOLAH & BANK DATA KELAS INDUK -->
+      <section id="wsTabAdmin" class="hidden">
+        <div class="grid-2" style="margin-bottom:1rem;">
+          <div class="card">
+            <div class="card-header">
+              <h3>🏫 Tambah Mata Pelajaran / Ekskul Baru</h3>
+            </div>
+            <form onsubmit="createNewRoom(event)">
+              <div class="form-group">
+                <label>Kategori Ruang *</label>
+                <select id="adminNewRoomType" class="form-control">
+                  <option value="Mata Pelajaran">Mata Pelajaran</option>
+                  <option value="Ekstrakurikuler">Ekstrakurikuler</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Nama Mata Pelajaran / Ekskul *</label>
+                <input type="text" id="adminNewRoomName" class="form-control" placeholder="Contoh: Bahasa Jawa / Pramuka" required />
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;">
+                <div class="form-group">
+                  <label>Nama Guru Pengampu *</label>
+                  <input type="text" id="adminNewRoomTeacher" class="form-control" placeholder="Nama Guru" required />
+                </div>
+                <div class="form-group">
+                  <label>Prefix Kode QR &amp; PIN *</label>
+                  <div style="display:flex; gap:0.4rem;">
+                    <input type="text" id="adminNewRoomPrefix" class="form-control mono" placeholder="BJW" maxlength="5" required style="text-transform:uppercase;" />
+                    <input type="text" id="adminNewRoomPin" class="form-control mono" value="1234" maxlength="8" required />
+                  </div>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%;">+ Simpan Mata Pelajaran / Ekskul</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>📚 Bank Data Kelas Induk (VIIA–IXG)</h3>
+              <select id="adminMasterClassSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderAdminMasterClassTable()"></select>
+            </div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.65rem;">
+              Saat Guru Mapel memilih kelas, daftar siswa di bawah ini otomatis masuk ke ruang mapel guru tersebut.
+            </p>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="openAddMasterStudentModal()">+ Tambah Siswa Induk</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="downloadMasterTemplateCSV()">⬇️ Template CSV</button>
+              <button type="button" class="btn btn-info btn-sm" onclick="document.getElementById('masterCsvUpload').click()">⬆️ Import CSV</button>
+              <input type="file" id="masterCsvUpload" accept=".csv,.txt" class="hidden" onchange="importMasterStudentsCSV(event)" />
+              <button type="button" class="btn btn-success btn-sm" onclick="exportMasterStudentsCSV()">📤 Export CSV</button>
+              <button type="button" class="btn btn-warning btn-sm" onclick="backupAllJson()">💾 Backup JSON</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('restoreJsonFile').click()">📂 Restore JSON</button>
+              <input type="file" id="restoreJsonFile" accept=".json" class="hidden" onchange="restoreAllJson(event)" />
+            </div>
+            <div class="table-wrap" style="max-height:220px; overflow-y:auto;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kode</th>
+                    <th>NISN</th>
+                    <th>Nama Siswa</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="adminMasterClassBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>🔑 Daftar Akun Guru Mapel, Guru Wali, Wali Kelas &amp; Guru BK</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Peran / Ruang</th>
+                  <th>Kategori</th>
+                  <th>Pengampu</th>
+                  <th>PIN Login</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="adminRoomsListBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===================================================================
+         3. WORKSPACE KHUSUS GURU WALI (HANYA ABSEN SHOLAT DZUHUR)
+         =================================================================== -->
+    <div id="guruWaliWorkspaceView" class="hidden">
+      <div class="hero-card">
+        <span class="badge badge-gold" style="margin-bottom:0.4rem;">🕌 AKUN KHUSUS GURU WALI</span>
+        <h2 id="guruWaliTitle">Absensi Sholat Dzuhur Berjamaah</h2>
+        <p id="guruWaliSub">Mode khusus pencatatan Sholat Dzuhur siswa per kelas (VIIA–IXG). Hasil absensi otomatis terkirim ke Wali Kelas, Guru BK, dan Guru Agama.</p>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3>📷 Scan QR Sholat Dzuhur</h3>
+            <input type="date" id="guruWaliDateInput" class="form-control" style="width:auto;" onchange="refreshGuruWaliUI()" />
+          </div>
+          <div class="scanner-box" style="margin-bottom:0.85rem;">
+            <video id="gwVideo" class="hidden" playsinline muted></video>
+            <div id="gwOverlay" class="scanner-overlay hidden"></div>
+            <p id="gwCamPlaceholder" style="color:#cbd5e1; font-size:0.82rem; text-align:center; padding:1rem;">
+              Kamera pemindai Sholat Dzuhur belum aktif.<br/>Klik tombol di bawah atau ketik Kode QR / NISN / Nama siswa.
+            </p>
+          </div>
+          <div style="display:flex; gap:0.5rem; margin-bottom:0.85rem; flex-wrap:wrap;">
+            <button type="button" id="btnStartGwCam" class="btn btn-primary" onclick="startQrCamera('gw')">📷 Mulai Scan Sholat Dzuhur</button>
+            <button type="button" id="btnStopGwCam" class="btn btn-danger hidden" onclick="stopAllCameras()">⏹ Matikan Kamera</button>
+          </div>
+          <form onsubmit="handleGuruWaliManualScan(event)" style="display:flex; gap:0.5rem;">
+            <input type="text" id="gwCodeInput" class="form-control mono" placeholder="Ketik Kode QR / NISN / Nama siswa..." style="text-transform:uppercase;" />
+            <button type="submit" class="btn btn-success">🕌 Jamaah</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Daftar Sholat Dzuhur per Kelas</h3>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+              <select id="gwClassSelect" class="form-control" style="width:auto; font-weight:800;" onchange="refreshGuruWaliUI()"></select>
+              <button type="button" class="btn btn-success btn-sm" onclick="markAllGuruWaliJamaah()">✅ Jamaah Semua</button>
+            </div>
+          </div>
+          <div style="margin-bottom:0.65rem;">
+            <span id="gwSummaryBadge" class="badge badge-success">Jamaah Dzuhur: 0 Siswa</span>
+          </div>
+          <div class="table-wrap" style="max-height:380px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Siswa &amp; Kode</th>
+                  <th>Status Dzuhur</th>
+                  <th>Tandai</th>
+                </tr>
+              </thead>
+              <tbody id="gwTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         4. DASHBOARD LAPORAN TERPADU WALI KELAS & GURU BK (VII / VIII / IX)
+         =================================================================== -->
+    <div id="homeroomDashboardView" class="hidden">
+      <div class="hero-card">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:0.75rem;">
+          <div>
+            <span id="hrRoleBadge" class="badge badge-gold" style="margin-bottom:0.4rem;">WALI KELAS</span>
+            <h2 id="hrTitle">Laporan Terpadu — Wali Kelas VIIA</h2>
+            <p id="hrSubtitle">Menerima rekap kehadiran siswa dari Absen Pagi, Sholat Dzuhur &amp; Dhuha, dan seluruh Guru Mata Pelajaran.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <select id="bkClassSelector" class="form-control hidden" style="width:auto; font-weight:800;" onchange="refreshHomeroomDashboard()"></select>
+            <input type="date" id="hrDateInput" class="form-control" style="width:auto;" onchange="refreshHomeroomDashboard()" />
+            <button type="button" class="btn btn-success btn-sm" onclick="exportHomeroomCSV()">📥 Export Laporan CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="hrStatsGrid" style="margin-bottom:1rem;"></div>
+
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-header">
+          <h3>📊 Matriks Laporan Kehadiran Siswa (Absen Pagi + Sholat + Semua Guru Mapel)</h3>
+          <span id="hrActiveMapelBadge" class="badge badge-info">0 Mapel Mengisi Absen</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>NISN</th>
+                <th>Nama Siswa</th>
+                <th>☀️ Absen Pagi</th>
+                <th>🕌 Sholat Dzuhur</th>
+                <th>🌅 Sholat Dhuha</th>
+                <th>📘 Ringkasan Mapel</th>
+              </tr>
+            </thead>
+            <tbody id="hrMatrixTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>📩 Daftar Pengajuan Izin / Sakit Kelas Ini</h3>
+          <span id="hrIzinModeNote" class="badge badge-purple">Laporan Izin Siswa</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Nama Siswa</th>
+                <th>Jenis &amp; Alasan</th>
+                <th>Bukti Foto</th>
+                <th>Status Verifikasi</th>
+              </tr>
+            </thead>
+            <tbody id="hrIzinTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL LOGIN -->
+  <div id="loginModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>🔐 Login Sistem Absensi SMPN 1 Tempuran</h3>
+        <button type="button" class="btn btn-danger btn-xs" onclick="closeModal('loginModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="handleLoginSubmit(event)">
+          <div class="form-group">
+            <label for="loginRoleSelect">Pilih Peran Pengguna *</label>
+            <select id="loginRoleSelect" class="form-control" onchange="handleLoginRoleChange()">
+              <option value="guru">👨‍🏫 Guru Mata Pelajaran / Pembina Ekskul (PIN: 1234)</option>
+              <option value="guru_wali">🕌 Guru Wali — Khusus Absen Sholat Dzuhur (PIN: 4040)</option>
+              <option value="wali_kelas">👩‍🏫 Wali Kelas VIIA–IXG (PIN: 2026)</option>
+              <option value="guru_bk">🧑‍⚕️ Guru BK Jenjang VII / VIII / IX (PIN: 3030)</option>
+              <option value="admin">🛡️ Admin Sekolah (PIN: 9999)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="loginRoomGroup">
+            <label for="loginRoomSelect">Pilih Mata Pelajaran / Ekskul *</label>
+            <select id="loginRoomSelect" class="form-control"></select>
+          </div>
+
+          <div class="form-group hidden" id="loginWaliClassGroup">
+            <label for="loginWaliClassSelect">Pilih Kelas Perwalian *</label>
+            <select id="loginWaliClassSelect" class="form-control"></select>
+          </div>
+
+          <div class="form-group hidden" id="loginBkLevelGroup">
+            <label for="loginBkLevelSelect">Pilih Jenjang Binaan Guru BK *</label>
+            <select id="loginBkLevelSelect" class="form-control">
+              <option value="VII">Guru BK Kelas VII (VIIA – VIIG)</option>
+              <option value="VIII">Guru BK Kelas VIII (VIIIA – VIIIG)</option>
+              <option value="IX">Guru BK Kelas IX (IXA – IXG)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="loginPinInput">PIN Akses *</label>
+            <input type="password" id="loginPinInput" class="form-control mono" placeholder="Masukkan PIN..." inputmode="numeric" required />
+          </div>
+
+          <p id="loginErrorMsg" class="hidden" style="color:var(--danger); font-size:0.8rem; font-weight:700; margin-bottom:0.75rem;"></p>
+          <button type="submit" class="btn btn-primary" style="width:100%;">Masuk ke Sistem</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL TAMBAH SISWA -->
+  <div id="addStudentModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="addStudentModalTitle">+ Tambah Siswa Baru</h3>
+        <button type="button" class="btn btn-danger btn-xs" onclick="closeModal('addStudentModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="submitAddStudent(event)">
+          <input type="hidden" id="addStudentTargetMode" value="room" />
+          <div class="form-group">
+            <label>Nama Lengkap Siswa *</label>
+            <input type="text" id="newStudentName" class="form-control" placeholder="NAMA LENGKAP" required style="text-transform:uppercase;" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;">
+            <div class="form-group">
+              <label>Kelas *</label>
+              <select id="newStudentClass" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label>NISN (10 Digit)</label>
+              <input type="text" id="newStudentNisn" class="form-control mono" placeholder="0118910001" maxlength="12" />
+            </div>
+          </div>
+          <div class="form-group" id="newStudentSesiGroup">
+            <label>Sesi / Kelompok (Khusus Ekskul)</label>
+            <select id="newStudentSesi" class="form-control">
+              <option value="1">Sesi 1</option>
+              <option value="2">Sesi 2</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">Simpan Siswa</button>
+        </form>
+
+        <div style="margin-top:0.9rem; padding-top:0.8rem; border-top:1px dashed var(--border);">
+          <div style="font-size:0.76rem; font-weight:800; color:var(--text-muted); margin-bottom:0.45rem;">ATAU KELOLA DATA MASSAL (CSV / EXCEL):</div>
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline btn-xs" onclick="triggerModalCsvTemplate()">⬇️ Template CSV</button>
+            <button type="button" class="btn btn-info btn-xs" onclick="triggerModalCsvImport()">⬆️ Import CSV</button>
+            <button type="button" class="btn btn-success btn-xs" onclick="triggerModalCsvExport()">📤 Export CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL LIHAT FOTO BUKTI IZIN -->
+  <div id="photoPreviewModal" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width:540px;">
+      <div class="modal-head">
+        <h3 id="photoPreviewTitle">📸 Bukti Foto Wajah &amp; Surat Izin</h3>
+        <button type="button" class="btn btn-danger btn-xs" onclick="closeModal('photoPreviewModal')">✕</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <p id="photoPreviewCaption" style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.75rem;"></p>
+        <img id="photoPreviewImg" alt="Bukti Foto Izin" style="max-width:100%; max-height:65vh; border-radius:12px; border:1px solid var(--border);" />
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer" class="toast-wrap"></div>
+
+  <script>
+    /**
+     * =========================================================================
+     * SISTEM ABSENSI DIGITAL TERPADU - SMP NEGERI 1 TEMPURAN
+     * Lengkap: Absen Pagi, Izin Kamera Langsung Wajah+Surat, Kartu QR Resmi,
+     * Guru Mapel/Ekskul, Guru Agama, Guru Wali, Wali Kelas, Guru BK, Admin.
+     * =========================================================================
+     */
+
+    const STORAGE_KEY = 'smpn1tempuran_terpadu_v5';
+
+    const ALL_CLASSES = [
+      'VIIA','VIIB','VIIC','VIID','VIIE','VIIF','VIIG',
+      'VIIIA','VIIIB','VIIIC','VIIID','VIIIE','VIIIF','VIIIG',
+      'IXA','IXB','IXC','IXD','IXE','IXF','IXG'
+    ];
+
+    const CLASS_LABELS = {
+      VIIA:'7A (VIIA)', VIIB:'7B (VIIB)', VIIC:'7C (VIIC)', VIID:'7D (VIID)', VIIE:'7E (VIIE)', VIIF:'7F (VIIF)', VIIG:'7G (VIIG)',
+      VIIIA:'8A (VIIIA)', VIIIB:'8B (VIIIB)', VIIIC:'8C (VIIIC)', VIIID:'8D (VIIID)', VIIIE:'8E (VIIIE)', VIIIF:'8F (VIIIF)', VIIIG:'8G (VIIIG)',
+      IXA:'9A (IXA)', IXB:'9B (IXB)', IXC:'9C (IXC)', IXD:'9D (IXD)', IXE:'9E (IXE)', IXF:'9F (IXF)', IXG:'9G (IXG)'
+    };
+
+    const DEFAULT_SCHOOL_LOGO_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+        <path d="M60 6 L108 26 L102 82 C98 100 78 112 60 116 C42 112 22 100 18 82 L12 26 Z" fill="#38bdf8" stroke="#0a1931" stroke-width="5"/>
+        <circle cx="60" cy="62" r="32" fill="#ffffff" stroke="#0a1931" stroke-width="3"/>
+        <polygon points="60,34 68,58 60,52 52,58" fill="#0a1931"/>
+        <path d="M36 86 Q60 76 84 86 L80 95 Q60 86 40 95 Z" fill="#dc2626"/>
+        <text x="60" y="23" font-family="Arial" font-size="8.5" font-weight="bold" fill="#0a1931" text-anchor="middle">SMP NEGERI 1</text>
+      </svg>`
+    );
+
+    const DEFAULT_ROOMS = [
+      { id: 'ekskul_kd', type: 'Ekstrakurikuler', name: 'Ekstrakurikuler Kreasi Digital', teacher: 'Pembina Kreasi Digital', prefix: 'KD', pin: '1234' },
+      { id: 'mapel_mtk', type: 'Mata Pelajaran', name: 'Matematika', teacher: 'Guru Matematika', prefix: 'MTK', pin: '1234' },
+      { id: 'mapel_bindo', type: 'Mata Pelajaran', name: 'Bahasa Indonesia', teacher: 'Guru Bahasa Indonesia', prefix: 'IND', pin: '1234' },
+      { id: 'mapel_bing', type: 'Mata Pelajaran', name: 'Bahasa Inggris', teacher: 'Guru Bahasa Inggris', prefix: 'ING', pin: '1234' },
+      { id: 'mapel_ipa', type: 'Mata Pelajaran', name: 'Ilmu Pengetahuan Alam (IPA)', teacher: 'Guru IPA', prefix: 'IPA', pin: '1234' },
+      { id: 'mapel_ips', type: 'Mata Pelajaran', name: 'Ilmu Pengetahuan Sosial (IPS)', teacher: 'Guru IPS', prefix: 'IPS', pin: '1234' },
+      { id: 'mapel_pai', type: 'Mata Pelajaran', name: 'Pendidikan Agama Islam (PAI)', teacher: 'Guru PAI', prefix: 'PAI', pin: '1234' },
+      { id: 'mapel_ppkn', type: 'Mata Pelajaran', name: 'Pendidikan Pancasila (PPKn)', teacher: 'Guru PPKn', prefix: 'PKN', pin: '1234' },
+      { id: 'mapel_pjok', type: 'Mata Pelajaran', name: 'PJOK', teacher: 'Guru PJOK', prefix: 'PJK', pin: '1234' },
+      { id: 'mapel_inf', type: 'Mata Pelajaran', name: 'Informatika', teacher: 'Guru Informatika', prefix: 'INF', pin: '1234' },
+      { id: 'mapel_sbk', type: 'Mata Pelajaran', name: 'Seni Budaya & Prakarya', teacher: 'Guru Seni Budaya', prefix: 'SBK', pin: '1234' }
+    ];
+
+    const SAMPLE_FIRST = ['ALIFIAN','BAGAS','CITRA','DIMAS','DEWI','FAJAR','FATIMAH','HAFIZH','HANA','KURNIAWAN','LESTARI','MUHAMMAD','NABILA','RAFAEL','SALSABILA'];
+    const SAMPLE_LAST = ['PRATAMA','RAMADHANI','SARI','HIDAYAT','WIJAYA','PUTRI','NUGROHO','AZZAHRA','SAPUTRA','PERMATASARI'];
+
+    function generateDefaultMasterStudents() {
+      const master = {};
+      ALL_CLASSES.forEach((cls, cIdx) => {
+        master[cls] = [];
+        for (let i = 1; i <= 10; i++) {
+          const fn = SAMPLE_FIRST[(cIdx * 3 + i) % SAMPLE_FIRST.length];
+          const ln = SAMPLE_LAST[(cIdx + i * 2) % SAMPLE_LAST.length];
+          const num = String(i).padStart(2, '0');
+          master[cls].push({
+            id: `${cls}-0${num}`,
+            nisn: `01189${String(10 + cIdx).padStart(2,'0')}0${num}`,
+            name: `${fn} ${ln} (${cls})`,
+            kelas: cls,
+            sesi: i <= 5 ? 1 : 2
+          });
+        }
+      });
+      return master;
+    }
+
+    function getTodayISO() {
+      const now = new Date();
+      return new Date(now - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    }
+
+    function normalizeClassCode(raw) {
+      if (!raw) return '';
+      let c = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+      c = c.replace(/^9([A-G])$/, 'IX$1').replace(/^8([A-G])$/, 'VIII$1').replace(/^7([A-G])$/, 'VII$1');
+      return c;
+    }
+
+    function isAgamaRoom(room) {
+      if (!room) return false;
+      const hay = `${room.id} ${room.name}`.toLowerCase();
+      return hay.includes('pai') || hay.includes('agama');
+    }
+
+    function isEkskulRoom(room) {
+      return room && String(room.type || '').toLowerCase().includes('ekstra');
+    }
+
+    let appData = null;
+    let currentSession = { role: 'public', roomId: 'mapel_mtk', waliClass: 'VIIA', bkLevel: 'VII' };
+    let activeCameraStream = null;
+    let activeScanInterval = null;
+    let izinStream = null;
+    let izinFacingMode = 'user';
+    let capturedIzinDataUrl = null;
+    let lastQrHit = { code: '', time: 0 };
+
+    function loadAppData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          appData = JSON.parse(raw);
+        }
+      } catch (e) {}
+
+      if (!appData || !Array.isArray(appData.rooms)) {
+        const masterStudents = generateDefaultMasterStudents();
+        const waliPins = {};
+        ALL_CLASSES.forEach(c => waliPins[c] = '2026');
+
+        const kdStudents = [];
+        ['VIIA','VIIB','VIIC','VIIIA','VIIIB'].forEach((cls, idx) => {
+          masterStudents[cls].slice(0, 9).forEach((s, i) => {
+            const sesi = idx < 3 ? 1 : 2;
+            kdStudents.push({
+              id: `KD${sesi}-${String(kdStudents.length + 1).padStart(2, '0')}`,
+              nisn: s.nisn,
+              name: s.name,
+              kelas: cls,
+              sesi
+            });
+          });
+        });
+
+        appData = {
+          adminPin: '9999',
+          guruWaliPin: '4040',
+          guruWaliName: 'Guru Wali Sholat Dzuhur',
+          bkPins: { VII: '3030', VIII: '3030', IX: '3030' },
+          waliPins,
+          schoolLogo: DEFAULT_SCHOOL_LOGO_SVG,
+          rooms: JSON.parse(JSON.stringify(DEFAULT_ROOMS)),
+          masterStudents,
+          roomStudents: { ekstul_kd: kdStudents, ekskul_kd: kdStudents },
+          pagiAttendance: {},
+          roomAttendance: {},
+          sholatAttendance: {},
+          izinRequests: []
+        };
+        saveAppData();
+      }
+      if (!appData.schoolLogo) appData.schoolLogo = DEFAULT_SCHOOL_LOGO_SVG;
+      if (!appData.guruWaliPin) appData.guruWaliPin = '4040';
+      if (!appData.bkPins) appData.bkPins = { VII: '3030', VIII: '3030', IX: '3030' };
+    }
+
+    function saveAppData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+      } catch (e) {}
+    }
+
+    function showToast(type, title, desc = '') {
+      const wrap = document.getElementById('toastContainer');
+      if (!wrap) return;
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.innerHTML = `<strong>${title}</strong>${desc ? `<div>${desc}</div>` : ''}`;
+      wrap.appendChild(el);
+      setTimeout(() => { el.remove(); }, 3400);
+    }
+
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+      if (id === 'photoPreviewModal') return;
+    }
+
+    /* =====================================================================
+       QR CODE GENERATOR SVG (NAVY #0a1931)
+       ===================================================================== */
+    function createQrSvg(text) {
+      const size = 21;
+      const m = Array.from({ length: size }, () => Array(size).fill(0));
+      function finder(r0, c0) {
+        for (let r = -1; r <= 7; r++) {
+          for (let c = -1; c <= 7; c++) {
+            const rr = r0 + r, cc = c0 + c;
+            if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+            if (r === -1 || r === 7 || c === -1 || c === 7) m[rr][cc] = 2;
+            else if (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) m[rr][cc] = 1;
+            else m[rr][cc] = 2;
+          }
+        }
+      }
+      finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
+      for (let i = 8; i < size - 8; i++) {
+        m[6][i] = i % 2 === 0 ? 1 : 2;
+        m[i][6] = i % 2 === 0 ? 1 : 2;
+      }
+      let h = 2166136261;
+      const s = String(text || 'SMPN1');
+      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+      let seed = h >>> 0;
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (m[r][c] === 0) {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            m[r][c] = (((seed >>> 24) ^ s.charCodeAt((r * size + c) % s.length)) & 1) ? 1 : 2;
+          }
+        }
+      }
+      let rects = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (m[r][c] === 1) rects += `<rect x="${c}" y="${r}" width="1" height="1" fill="#0a1931"/>`;
+        }
+      }
+      return `<svg viewBox="0 0 ${size} ${size}" width="100%" height="100%" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" fill="#ffffff"/>${rects}</svg>`;
+    }
+
+    /* =====================================================================
+       KAMERA SCANNER QR (PAGI, GURU MAPEL, ABSEN SHOLAT, GURU WALI)
+       ===================================================================== */
+    function stopAllCameras() {
+      if (activeScanInterval) { clearInterval(activeScanInterval); activeScanInterval = null; }
+      if (activeCameraStream) { activeCameraStream.getTracks().forEach(t => t.stop()); activeCameraStream = null; }
+      ['pagi', 'ws', 'sholat', 'gw'].forEach(prefix => {
+        const v = document.getElementById(`${prefix}Video`);
+        const ov = document.getElementById(`${prefix}Overlay`);
+        const ph = document.getElementById(`${prefix}CamPlaceholder`);
+        const capPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+        const bStart = document.getElementById(`btnStart${capPrefix}Cam`);
+        const bStop = document.getElementById(`btnStop${capPrefix}Cam`);
+        if (v) { v.srcObject = null; v.classList.add('hidden'); }
+        if (ov) ov.classList.add('hidden');
+        if (ph) ph.classList.remove('hidden');
+        if (bStart) bStart.classList.remove('hidden');
+        if (bStop) bStop.classList.add('hidden');
+      });
+    }
+
+    async function startQrCamera(mode) {
+      stopAllCameras();
+      stopIzinCamera();
+      const v = document.getElementById(`${mode}Video`);
+      const ov = document.getElementById(`${mode}Overlay`);
+      const ph = document.getElementById(`${mode}CamPlaceholder`);
+      const cap = mode.charAt(0).toUpperCase() + mode.slice(1);
+      const bStart = document.getElementById(`btnStart${cap}Cam`);
+      const bStop = document.getElementById(`btnStop${cap}Cam`);
+
+      try {
+        activeCameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        v.srcObject = activeCameraStream;
+        await v.play();
+        v.classList.remove('hidden');
+        if (ov) ov.classList.remove('hidden');
+        if (ph) ph.classList.add('hidden');
+        if (bStart) bStart.classList.add('hidden');
+        if (bStop) bStop.classList.remove('hidden');
+
+        if ('BarcodeDetector' in window) {
+          const detector = new BarcodeDetector({ formats: ['qr_code'] });
+          activeScanInterval = setInterval(async () => {
+            if (!activeCameraStream || v.readyState < 2) return;
+            try {
+              const codes = await detector.detect(v);
+              if (codes && codes.length) {
+                const raw = (codes[0].rawValue || '').trim().toUpperCase();
+                const now = Date.now();
+                if (raw && (raw !== lastQrHit.code || now - lastQrHit.time > 2800)) {
+                  lastQrHit = { code: raw, time: now };
+                  if (mode === 'pagi') processPagiScan(raw);
+                  else if (mode === 'ws') processWsScan(raw);
+                  else if (mode === 'sholat') processWsSholatScan(raw);
+                  else if (mode === 'gw') processGuruWaliScan(raw);
+                }
+              }
+            } catch (e) {}
+          }, 420);
+        } else {
+          showToast('error', 'Browser Tidak Mendukung Auto-Scan QR', 'Gunakan Google Chrome Android terbaru atau ketik kode di kolom bawah.');
+        }
+      } catch (err) {
+        showToast('error', 'Kamera Tidak Dapat Dibuka', 'Pastikan izin kamera diaktifkan atau ketik kode siswa secara manual.');
+      }
+    }
+
+    /* =====================================================================
+       1. LOGIKA PORTAL PUBLIK: ABSEN PAGI & IZIN FOTO LANGSUNG
+       ===================================================================== */
+    function switchPublicTab(tab) {
+      stopAllCameras();
+      stopIzinCamera();
+      document.getElementById('publicPagiSection').classList.toggle('hidden', tab !== 'pagi');
+      document.getElementById('publicIzinSection').classList.toggle('hidden', tab !== 'izin');
+      document.getElementById('pubTabPagi').classList.toggle('active', tab === 'pagi');
+      document.getElementById('pubTabIzin').classList.toggle('active', tab === 'izin');
+      if (tab === 'izin') populateIzinStudentsByClass();
+    }
+
+    function findStudentAcrossAllClasses(query) {
+      const q = String(query || '').trim().toUpperCase();
+      if (!q) return null;
+      for (const cls of ALL_CLASSES) {
+        const list = appData.masterStudents[cls] || [];
+        const exact = list.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q));
+        if (exact) return { student: exact, cls };
+      }
+      for (const room of appData.rooms) {
+        const list = appData.roomStudents[room.id] || [];
+        const exact = list.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q));
+        if (exact) {
+          const mappedCls = normalizeClassCode(exact.kelas) || 'VIIA';
+          const masterMatch = (appData.masterStudents[mappedCls] || []).find(m => m.name === exact.name) || exact;
+          return { student: masterMatch, cls: mappedCls };
+        }
+      }
+      for (const cls of ALL_CLASSES) {
+        const list = appData.masterStudents[cls] || [];
+        const byName = list.find(s => s.name.toUpperCase().includes(q));
+        if (byName) return { student: byName, cls };
+      }
+      return null;
+    }
+
+    function recordPagiStatus(cls, studentId, status) {
+      const dateStr = document.getElementById('pagiDateInput').value || getTodayISO();
+      if (!appData.pagiAttendance[dateStr]) appData.pagiAttendance[dateStr] = {};
+      if (!appData.pagiAttendance[dateStr][cls]) appData.pagiAttendance[dateStr][cls] = {};
+      const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      appData.pagiAttendance[dateStr][cls][studentId] = { status, time };
+      saveAppData();
+      refreshPagiUI();
+    }
+
+    function processPagiScan(code) {
+      const found = findStudentAcrossAllClasses(code);
+      if (!found) {
+        showToast('error', 'Siswa Tidak Ditemukan', `Kode/Nama "${code}" tidak terdaftar.`);
+        return;
+      }
+      document.getElementById('pagiClassSelect').value = found.cls;
+      recordPagiStatus(found.cls, found.student.id, 'Hadir');
+      showToast('success', `Absen Pagi: ${found.student.name}`, `Kelas ${CLASS_LABELS[found.cls]}`);
+    }
+
+    function handlePagiManualSubmit(e) {
+      e.preventDefault();
+      const inp = document.getElementById('pagiCodeInput');
+      if (!inp.value.trim()) return;
+      processPagiScan(inp.value.trim());
+      inp.value = '';
+    }
+
+    function refreshPagiUI() {
+      const cls = document.getElementById('pagiClassSelect').value || 'VIIA';
+      const dateStr = document.getElementById('pagiDateInput').value || getTodayISO();
+      const students = appData.masterStudents[cls] || [];
+      const dayMap = (appData.pagiAttendance[dateStr] && appData.pagiAttendance[dateStr][cls]) || {};
+
+      let hadirCount = 0;
+      students.forEach(s => { if (dayMap[s.id] && (dayMap[s.id].status === 'Hadir' || dayMap[s.id].status === 'Telat')) hadirCount++; });
+      document.getElementById('pagiSummaryBadge').textContent = `Hadir Pagi: ${hadirCount} / ${students.length} Siswa`;
+
+      const tbody = document.getElementById('pagiTableBody');
+      tbody.innerHTML = students.map((s, i) => {
+        const rec = dayMap[s.id];
+        let badge = `<span class="badge">Belum</span>`;
+        if (rec) {
+          const bCls = rec.status === 'Hadir' ? 'badge-success' : rec.status === 'Telat' ? 'badge-warning' : 'badge-info';
+          badge = `<span class="badge ${bCls}">${rec.status} (${rec.time})</span>`;
+        }
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.id} • NISN: ${s.nisn || '-'}</div></td>
+            <td>${badge}</td>
+            <td>
+              <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-success btn-xs" onclick="recordPagiStatus('${cls}','${s.id}','Hadir')">Hadir</button>
+                <button type="button" class="btn btn-warning btn-xs" onclick="recordPagiStatus('${cls}','${s.id}','Telat')">Telat</button>
+                <button type="button" class="btn btn-info btn-xs" onclick="recordPagiStatus('${cls}','${s.id}','Izin')">Izin</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /* Kamera Foto Langsung Izin (Wajah + Surat) */
+    function populateIzinStudentsByClass() {
+      const cls = document.getElementById('izinClassSelect').value || 'VIIA';
+      const list = appData.masterStudents[cls] || [];
+      document.getElementById('izinStudentSelect').innerHTML = list.map(s =>
+        `<option value="${s.id}">${s.name} (${s.id})</option>`
+      ).join('');
+    }
+
+    async function startIzinCamera() {
+      stopAllCameras();
+      stopIzinCamera();
+      const box = document.getElementById('izinCamBox');
+      const v = document.getElementById('izinVideo');
+      try {
+        izinStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: izinFacingMode }, audio: false });
+        v.srcObject = izinStream;
+        v.style.transform = izinFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+        await v.play();
+        box.classList.remove('hidden');
+        document.getElementById('btnSwitchIzinCam').classList.remove('hidden');
+        document.getElementById('btnSnapIzinPhoto').classList.remove('hidden');
+        document.getElementById('btnOpenIzinCam').textContent = '🔄 Mulai Ulang Kamera';
+      } catch (err) {
+        showToast('error', 'Kamera Tidak Tersedia', 'Izinkan akses kamera di browser HP Anda untuk mengambil foto wajah & surat izin.');
+      }
+    }
+
+    function switchIzinFacingMode() {
+      izinFacingMode = izinFacingMode === 'user' ? 'environment' : 'user';
+      startIzinCamera();
+    }
+
+    function stopIzinCamera() {
+      if (izinStream) { izinStream.getTracks().forEach(t => t.stop()); izinStream = null; }
+      const box = document.getElementById('izinCamBox');
+      if (box) box.classList.add('hidden');
+      document.getElementById('btnSwitchIzinCam')?.classList.add('hidden');
+      document.getElementById('btnSnapIzinPhoto')?.classList.add('hidden');
+    }
+
+    function captureIzinPhoto() {
+      const v = document.getElementById('izinVideo');
+      if (!v || v.readyState < 2) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = Math.round((v.videoHeight / v.videoWidth) * 640) || 480;
+      const ctx = canvas.getContext('2d');
+      if (izinFacingMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      if (izinFacingMode === 'user') ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      // Cek kecerahan foto
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let lum = 0;
+      for (let i = 0; i < data.length; i += 16) lum += 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+      if (lum / (data.length / 16) < 35) {
+        showToast('error', 'Foto Terlalu Gelap', 'Pindah ke tempat lebih terang agar wajah dan surat terbaca.');
+        return;
+      }
+
+      // Stempel waktu & nama siswa
+      const cls = document.getElementById('izinClassSelect').value;
+      const stId = document.getElementById('izinStudentSelect').value;
+      const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
+      ctx.fillStyle = 'rgba(6, 15, 38, 0.78)';
+      ctx.fillRect(0, canvas.height - 34, canvas.width, 34);
+      ctx.fillStyle = '#fde047';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`SMPN 1 TEMPURAN • ${st ? st.name : stId} • ${new Date().toLocaleString('id-ID')}`, 10, canvas.height - 12);
+
+      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      const prev = document.getElementById('izinCapturedPreview');
+      prev.src = capturedIzinDataUrl;
+      prev.classList.remove('hidden');
+      document.getElementById('izinPhotoStatus').innerHTML = `<strong style="color:var(--success);">✅ Foto wajah & surat berhasil dijepret!</strong>`;
+      stopIzinCamera();
+    }
+
+    function submitPublicIzin(e) {
+      e.preventDefault();
+      if (!capturedIzinDataUrl) {
+        showToast('error', 'Foto Wajib Diambil', 'Silakan buka kamera dan jepret foto wajah memegang surat izin terlebih dahulu.');
+        return;
+      }
+      const cls = document.getElementById('izinClassSelect').value;
+      const stId = document.getElementById('izinStudentSelect').value;
+      const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
+      const dateStr = document.getElementById('izinDateInput').value || getTodayISO();
+      const type = document.getElementById('izinTypeSelect').value;
+      const reason = document.getElementById('izinReasonInput').value.trim();
+
+      appData.izinRequests.unshift({
+        id: `IZN-${Date.now().toString(36).toUpperCase()}`,
+        date: dateStr,
+        cls,
+        studentId: stId,
+        studentName: st ? st.name : stId,
+        type,
+        reason,
+        photo: capturedIzinDataUrl,
+        status: 'Menunggu Verifikasi'
+      });
+      saveAppData();
+
+      e.target.reset();
+      document.getElementById('izinDateInput').value = getTodayISO();
+      capturedIzinDataUrl = null;
+      document.getElementById('izinCapturedPreview').classList.add('hidden');
+      document.getElementById('izinPhotoStatus').textContent = 'Pengajuan terkirim. Klik Buka Kamera Foto jika ingin mengirim lagi.';
+      showToast('success', 'Pengajuan Izin Terkirim', `${st ? st.name : stId} (${CLASS_LABELS[cls]})`);
+    }
+
+    /* =====================================================================
+       2. SISTEM LOGIN MULTI-PERAN
+       ===================================================================== */
+    function openLoginModal() {
+      loadAppData();
+      populateLoginRoomDropdown();
+      document.getElementById('loginPinInput').value = '';
+      document.getElementById('loginErrorMsg').classList.add('hidden');
+      handleLoginRoleChange();
+      openModal('loginModal');
+    }
+
+    function populateLoginRoomDropdown() {
+      const sel = document.getElementById('loginRoomSelect');
+      if (!sel) return;
+      sel.innerHTML = appData.rooms.map(r =>
+        `<option value="${r.id}">[${r.type}] ${r.name} (${r.teacher})</option>`
+      ).join('');
+    }
+
+    function handleLoginRoleChange() {
+      const role = document.getElementById('loginRoleSelect').value;
+      document.getElementById('loginRoomGroup').classList.toggle('hidden', role !== 'guru');
+      document.getElementById('loginWaliClassGroup').classList.toggle('hidden', role !== 'wali_kelas');
+      document.getElementById('loginBkLevelGroup').classList.toggle('hidden', role !== 'guru_bk');
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const role = document.getElementById('loginRoleSelect').value;
+      const pin = document.getElementById('loginPinInput').value.trim();
+      const errEl = document.getElementById('loginErrorMsg');
+
+      if (role === 'guru') {
+        const roomId = document.getElementById('loginRoomSelect').value;
+        const room = appData.rooms.find(r => r.id === roomId);
+        if (!room || pin !== String(room.pin)) {
+          errEl.textContent = 'PIN Guru tidak sesuai untuk mata pelajaran/ekskul ini.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'guru', roomId: room.id };
+        closeModal('loginModal');
+        ensureRoomClassPopulated(room.id, 'VIIA');
+        applySessionView();
+        showToast('success', `Selamat Datang, ${room.teacher}`, room.name);
+      } else if (role === 'guru_wali') {
+        if (pin !== String(appData.guruWaliPin || '4040')) {
+          errEl.textContent = 'PIN Guru Wali salah (default: 4040).';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'guru_wali' };
+        closeModal('loginModal');
+        applySessionView();
+        showToast('success', 'Login Guru Wali Berhasil', 'Mode Khusus Absen Sholat Dzuhur');
+      } else if (role === 'wali_kelas') {
+        const cls = document.getElementById('loginWaliClassSelect').value;
+        const expected = (appData.waliPins && appData.waliPins[cls]) || '2026';
+        if (pin !== String(expected)) {
+          errEl.textContent = `PIN Wali Kelas ${CLASS_LABELS[cls]} salah (default: 2026).`;
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'wali_kelas', waliClass: cls };
+        closeModal('loginModal');
+        applySessionView();
+        showToast('success', `Login Wali Kelas ${CLASS_LABELS[cls]}`, 'Laporan Terpadu Siap');
+      } else if (role === 'guru_bk') {
+        const lvl = document.getElementById('loginBkLevelSelect').value;
+        const expected = (appData.bkPins && appData.bkPins[lvl]) || '3030';
+        if (pin !== String(expected)) {
+          errEl.textContent = `PIN Guru BK Kelas ${lvl} salah (default: 3030).`;
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'guru_bk', bkLevel: lvl };
+        closeModal('loginModal');
+        applySessionView();
+        showToast('success', `Login Guru BK Kelas ${lvl}`, 'Pemantauan Terpadu Aktif');
+      } else if (role === 'admin') {
+        if (pin !== String(appData.adminPin || '9999')) {
+          errEl.textContent = 'PIN Master Admin salah (default: 9999).';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'admin', roomId: appData.rooms[0]?.id || 'mapel_mtk' };
+        closeModal('loginModal');
+        applySessionView();
+        showToast('success', 'Login Admin Sekolah Berhasil', 'Akses Penuh Sistem');
+      }
+    }
+
+    function logoutRole() {
+      stopAllCameras();
+      stopIzinCamera();
+      currentSession = { role: 'public', roomId: 'mapel_mtk' };
+      applySessionView();
+      showToast('success', 'Keluar dari Sesi', 'Kembali ke Portal Publik');
+    }
+
+    function applySessionView() {
+      stopAllCameras();
+      const role = currentSession.role;
+      const pubView = document.getElementById('publicPortalView');
+      const wsView = document.getElementById('teacherWorkspaceView');
+      const gwView = document.getElementById('guruWaliWorkspaceView');
+      const hrView = document.getElementById('homeroomDashboardView');
+
+      pubView.classList.toggle('hidden', role !== 'public');
+      wsView.classList.toggle('hidden', role !== 'guru' && role !== 'admin');
+      gwView.classList.toggle('hidden', role !== 'guru_wali');
+      hrView.classList.toggle('hidden', role !== 'wali_kelas' && role !== 'guru_bk');
+
+      document.getElementById('btnOpenLogin').classList.toggle('hidden', role !== 'public');
+      document.getElementById('btnLogout').classList.toggle('hidden', role === 'public');
+
+      const badge = document.getElementById('roleBadge');
+      if (role === 'public') {
+        badge.className = 'role-pill pill-guest';
+        badge.textContent = 'Mode Publik / Siswa';
+        refreshPagiUI();
+      } else if (role === 'guru' || role === 'admin') {
+        const room = appData.rooms.find(r => r.id === currentSession.roomId) || appData.rooms[0];
+        currentSession.roomId = room.id;
+        const agama = isAgamaRoom(room);
+
+        badge.className = role === 'admin' ? 'role-pill pill-admin' : 'role-pill pill-teacher';
+        badge.textContent = role === 'admin' ? '🛡️ Admin Sekolah' : `👨‍🏫 ${room.name}`;
+
+        document.getElementById('wsRoleBadge').textContent = role === 'admin' ? 'ADMIN SEKOLAH' : room.type.toUpperCase();
+        document.getElementById('wsRoomTitle').textContent = room.name;
+        document.getElementById('wsRoomSub').textContent = `Pengampu: ${room.teacher} • Kode Prefix: ${room.prefix}`;
+
+        const switcher = document.getElementById('adminRoomSwitcher');
+        switcher.classList.toggle('hidden', role !== 'admin');
+        if (role === 'admin') {
+          switcher.innerHTML = appData.rooms.map(r => `<option value="${r.id}" ${r.id === room.id ? 'selected' : ''}>${r.name}</option>`).join('');
+        }
+
+        // Aturan visibilitas Absen Sholat: hanya Guru Agama & Admin
+        document.getElementById('wsTabBtnSholat').classList.toggle('hidden', !(role === 'admin' || agama));
+        document.getElementById('wsTabBtnAgamaRekap').classList.toggle('hidden', !(role === 'admin' || agama));
+        document.getElementById('wsTabBtnAdmin').classList.toggle('hidden', role !== 'admin');
+
+        populateWsClassFilter(room);
+        switchWsTab(role === 'admin' ? 'admin' : 'scan');
+        refreshWorkspaceUI();
+      } else if (role === 'guru_wali') {
+        badge.className = 'role-pill pill-homeroom';
+        badge.textContent = '🕌 Guru Wali (Sholat Dzuhur)';
+        document.getElementById('guruWaliDateInput').value = getTodayISO();
+        refreshGuruWaliUI();
+      } else if (role === 'wali_kelas' || role === 'guru_bk') {
+        badge.className = 'role-pill pill-homeroom';
+        badge.textContent = role === 'wali_kelas' ? `👩‍🏫 Wali Kelas ${CLASS_LABELS[currentSession.waliClass]}` : `🧑‍⚕️ Guru BK Kelas ${currentSession.bkLevel}`;
+        document.getElementById('hrDateInput').value = getTodayISO();
+
+        const bkSel = document.getElementById('bkClassSelector');
+        bkSel.classList.toggle('hidden', role !== 'guru_bk');
+        if (role === 'guru_bk') {
+          const lvlClasses = ALL_CLASSES.filter(c => c.startsWith(currentSession.bkLevel + 'A'.slice(0,0)) && (
+            currentSession.bkLevel === 'VII' ? c.startsWith('VII') && !c.startsWith('VIII') :
+            currentSession.bkLevel === 'VIII' ? c.startsWith('VIII') : c.startsWith('IX')
+          ));
+          bkSel.innerHTML = lvlClasses.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+        }
+        refreshHomeroomDashboard();
+      }
+    }
+
+    /* =====================================================================
+       3. WORKSPACE GURU MAPEL / EKSKUL / AGAMA / ADMIN
+       ===================================================================== */
+    function ensureRoomClassPopulated(roomId, cls) {
+      const room = appData.rooms.find(r => r.id === roomId);
+      if (!room || isEkskulRoom(room)) return 0;
+      if (!appData.roomStudents[roomId]) appData.roomStudents[roomId] = [];
+      const existing = appData.roomStudents[roomId];
+      const masterList = appData.masterStudents[cls] || [];
+      let added = 0;
+
+      masterList.forEach((ms, idx) => {
+        const already = existing.some(s => normalizeClassCode(s.kelas) === cls && s.name === ms.name);
+        if (!already) {
+          existing.push({
+            id: `${room.prefix}-${cls}-${String(idx + 1).padStart(2, '0')}`,
+            nisn: ms.nisn,
+            name: ms.name,
+            kelas: cls,
+            sesi: ms.sesi || 1
+          });
+          added++;
+        }
+      });
+      if (added > 0) saveAppData();
+      return added;
+    }
+
+    function populateWsClassFilter(room) {
+      const sel = document.getElementById('wsClassFilter');
+      if (isEkskulRoom(room)) {
+        sel.innerHTML = `<option value="ALL">Semua Sesi</option><option value="1">Sesi 1</option><option value="2">Sesi 2</option>`;
+        document.getElementById('btnSyncMasterClass').classList.add('hidden');
+      } else {
+        sel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+        document.getElementById('btnSyncMasterClass').classList.remove('hidden');
+        ensureRoomClassPopulated(room.id, sel.value);
+      }
+    }
+
+    function handleAdminSwitchRoom() {
+      const newId = document.getElementById('adminRoomSwitcher').value;
+      currentSession.roomId = newId;
+      applySessionView();
+    }
+
+    function handleWsClassFilterChange() {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const val = document.getElementById('wsClassFilter').value;
+      if (room && !isEkskulRoom(room)) {
+        const added = ensureRoomClassPopulated(room.id, val);
+        if (added > 0) showToast('success', `Kelas ${CLASS_LABELS[val]} Dimuat`, `${added} siswa otomatis masuk dari Bank Kelas Induk.`);
+      }
+      refreshWorkspaceUI();
+    }
+
+    function syncCurrentClassFromMaster() {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const cls = document.getElementById('wsClassFilter').value;
+      if (!room || isEkskulRoom(room)) return;
+      const added = ensureRoomClassPopulated(room.id, cls);
+      refreshWorkspaceUI();
+      showToast('success', 'Sinkronisasi Kelas Induk', added > 0 ? `${added} siswa baru ditambahkan.` : 'Semua siswa kelas ini sudah lengkap.');
+    }
+
+    function getFilteredWsStudents() {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      if (!room) return [];
+      const list = appData.roomStudents[room.id] || [];
+      const f = document.getElementById('wsClassFilter').value;
+      if (isEkskulRoom(room)) {
+        return f === 'ALL' ? list : list.filter(s => String(s.sesi || 1) === String(f));
+      }
+      return list.filter(s => normalizeClassCode(s.kelas) === f);
+    }
+
+    function switchWsTab(tab) {
+      stopAllCameras();
+      const map = {
+        scan: ['wsTabScan', 'wsTabBtnScan'],
+        sholat: ['wsTabSholat', 'wsTabBtnSholat'],
+        agamaRekap: ['wsTabAgamaRekap', 'wsTabBtnAgamaRekap'],
+        rekap: ['wsTabRekap', 'wsTabBtnRekap'],
+        kartu: ['wsTabKartu', 'wsTabBtnKartu'],
+        admin: ['wsTabAdmin', 'wsTabBtnAdmin']
+      };
+      Object.keys(map).forEach(k => {
+        document.getElementById(map[k][0])?.classList.toggle('hidden', k !== tab);
+        document.getElementById(map[k][1])?.classList.toggle('active', k === tab);
+      });
+      if (tab === 'sholat') renderWsSholatTable();
+      if (tab === 'agamaRekap') renderAgamaSholatRekap();
+      if (tab === 'rekap') renderRekapAndStudents();
+      if (tab === 'kartu') renderQrCards();
+      if (tab === 'admin') renderAdminPanel();
+    }
+
+    function recordWsAttendance(studentId, status, note = '') {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      if (!appData.roomAttendance[room.id]) appData.roomAttendance[room.id] = {};
+      if (!appData.roomAttendance[room.id][dateStr]) appData.roomAttendance[room.id][dateStr] = {};
+      const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      appData.roomAttendance[room.id][dateStr][studentId] = { status, time, note };
+      saveAppData();
+      refreshWorkspaceUI();
+    }
+
+    function processWsScan(query) {
+      const q = String(query || '').trim().toUpperCase();
+      const students = getFilteredWsStudents();
+      const found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
+      if (!found) {
+        showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak ada di kelas/sesi aktif.`);
+        return;
+      }
+      recordWsAttendance(found.id, 'Hadir', 'Scan QR');
+      showToast('success', `Hadir: ${found.name}`, `${found.id}`);
+    }
+
+    function handleWsManualScan(e) {
+      e.preventDefault();
+      const inp = document.getElementById('wsManualCodeInput');
+      if (!inp.value.trim()) return;
+      processWsScan(inp.value.trim());
+      inp.value = '';
+    }
+
+    function markAllWsPresent() {
+      const students = getFilteredWsStudents();
+      students.forEach(s => recordWsAttendance(s.id, 'Hadir', 'Hadir Semua'));
+      showToast('success', 'Semua Siswa Dihadirkan', `${students.length} siswa ditandai Hadir.`);
+    }
+
+    function refreshWorkspaceUI() {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      if (!room) return;
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const students = getFilteredWsStudents();
+      const att = (appData.roomAttendance[room.id] && appData.roomAttendance[room.id][dateStr]) || {};
+      const f = document.getElementById('wsClassFilter').value;
+
+      document.getElementById('wsActiveGroupBadge').textContent = isEkskulRoom(room) ? (f === 'ALL' ? 'Semua Sesi' : `Sesi ${f}`) : CLASS_LABELS[f];
+
+      const tbody = document.getElementById('wsQuickTableBody');
+      tbody.innerHTML = students.map((s, idx) => {
+        const r = att[s.id];
+        let badge = `<span class="badge">Belum</span>`;
+        if (r) {
+          const bCls = r.status === 'Hadir' ? 'badge-success' : r.status === 'Sakit' ? 'badge-warning' : r.status === 'Izin Penting' ? 'badge-info' : 'badge-danger';
+          badge = `<span class="badge ${bCls}">${r.status}</span>`;
+        }
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.kelas} • ${s.id}</div></td>
+            <td>${badge}</td>
+            <td>
+              <div style="display:flex; gap:3px;">
+                <button type="button" class="btn btn-success btn-xs" onclick="recordWsAttendance('${s.id}','Hadir')">H</button>
+                <button type="button" class="btn btn-info btn-xs" onclick="recordWsAttendance('${s.id}','Sakit')">S</button>
+                <button type="button" class="btn btn-warning btn-xs" onclick="recordWsAttendance('${s.id}','Izin Penting')">I</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="recordWsAttendance('${s.id}','Alpa')">A</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      if (!document.getElementById('wsTabSholat').classList.contains('hidden')) renderWsSholatTable();
+      if (!document.getElementById('wsTabRekap').classList.contains('hidden')) renderRekapAndStudents();
+      if (!document.getElementById('wsTabKartu').classList.contains('hidden')) renderQrCards();
+    }
+
+    /* Absen Sholat oleh Guru Agama / Admin */
+    function recordSholatForMasterStudent(cls, masterStudentId, sholatType, status, sourceLabel) {
+      const dateStr = document.getElementById('wsDateInput')?.value || document.getElementById('guruWaliDateInput')?.value || getTodayISO();
+      if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
+      if (!appData.sholatAttendance[dateStr][cls]) appData.sholatAttendance[dateStr][cls] = {};
+      if (!appData.sholatAttendance[dateStr][cls][masterStudentId]) appData.sholatAttendance[dateStr][cls][masterStudentId] = {};
+      const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      appData.sholatAttendance[dateStr][cls][masterStudentId][sholatType] = { status, time, by: sourceLabel };
+      saveAppData();
+    }
+
+    function resolveMasterStudent(studentObj) {
+      const cls = normalizeClassCode(studentObj.kelas) || 'VIIA';
+      const list = appData.masterStudents[cls] || [];
+      const found = list.find(m => m.nisn === studentObj.nisn || m.name === studentObj.name) || list[0];
+      return { cls, masterId: found ? found.id : studentObj.id };
+    }
+
+    function processWsSholatScan(query) {
+      const q = String(query || '').trim().toUpperCase();
+      const students = getFilteredWsStudents();
+      const found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
+      if (!found) {
+        showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak ada di kelas/sesi aktif.`);
+        return;
+      }
+      const sholatType = document.getElementById('wsSholatType').value;
+      const m = resolveMasterStudent(found);
+      recordSholatForMasterStudent(m.cls, m.masterId, sholatType, 'Jamaah', 'Guru Agama');
+      renderWsSholatTable();
+      showToast('success', `Sholat ${sholatType}: ${found.name}`, 'Status: Jamaah');
+    }
+
+    function handleWsSholatManualScan(e) {
+      e.preventDefault();
+      const inp = document.getElementById('wsSholatCodeInput');
+      if (!inp.value.trim()) return;
+      processWsSholatScan(inp.value.trim());
+      inp.value = '';
+    }
+
+    function setWsSholatStatus(studentId, status) {
+      const students = getFilteredWsStudents();
+      const st = students.find(s => s.id === studentId);
+      if (!st) return;
+      const sholatType = document.getElementById('wsSholatType').value;
+      const m = resolveMasterStudent(st);
+      recordSholatForMasterStudent(m.cls, m.masterId, sholatType, status, 'Guru Agama');
+      renderWsSholatTable();
+    }
+
+    function markAllWsSholatJamaah() {
+      const students = getFilteredWsStudents();
+      const sholatType = document.getElementById('wsSholatType').value;
+      students.forEach(st => {
+        const m = resolveMasterStudent(st);
+        recordSholatForMasterStudent(m.cls, m.masterId, sholatType, 'Jamaah', 'Guru Agama');
+      });
+      renderWsSholatTable();
+      showToast('success', `Semua Jamaah (${sholatType})`, `${students.length} siswa tercatat.`);
+    }
+
+    function renderWsSholatTable() {
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const sholatType = document.getElementById('wsSholatType').value;
+      const students = getFilteredWsStudents();
+      const tbody = document.getElementById('wsSholatTableBody');
+
+      tbody.innerHTML = students.map((s, idx) => {
+        const m = resolveMasterStudent(s);
+        const rec = appData.sholatAttendance?.[dateStr]?.[m.cls]?.[m.masterId]?.[sholatType];
+        let badge = `<span class="badge">Belum</span>`;
+        if (rec) {
+          const bCls = rec.status === 'Jamaah' ? 'badge-success' : rec.status === 'Udzur' ? 'badge-purple' : 'badge-danger';
+          badge = `<span class="badge ${bCls}">${rec.status} (${rec.time})</span>`;
+        }
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.id}</div></td>
+            <td>${badge}</td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="btn btn-success btn-xs" onclick="setWsSholatStatus('${s.id}','Jamaah')">Jamaah</button>
+                <button type="button" class="btn btn-purple btn-xs" onclick="setWsSholatStatus('${s.id}','Udzur')">Udzur</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="setWsSholatStatus('${s.id}','Tidak')">Tidak</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportWsSholatCSV() {
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const sholatType = document.getElementById('wsSholatType').value;
+      const students = getFilteredWsStudents();
+      const rows = [['No','Kode QR','Nama Siswa','Kelas','Tanggal','Sholat','Status']];
+      students.forEach((s, i) => {
+        const m = resolveMasterStudent(s);
+        const rec = appData.sholatAttendance?.[dateStr]?.[m.cls]?.[m.masterId]?.[sholatType];
+        rows.push([i + 1, s.id, `"${s.name}"`, s.kelas, dateStr, sholatType, rec ? rec.status : 'Belum']);
+      });
+      downloadCsvFile(rows, `Absen_Sholat_${sholatType}_${dateStr}.csv`);
+    }
+
+    /* Rekap Sholat Lintas Kelas (Guru Agama & Admin) */
+    function renderAgamaSholatRekap() {
+      const sel = document.getElementById('agamaSholatClassSelect');
+      if (!sel.options.length) {
+        sel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+      }
+      const cls = sel.value || 'VIIA';
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const list = appData.masterStudents[cls] || [];
+      const clsSholat = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+
+      document.getElementById('agamaSholatTableBody').innerHTML = list.map((s, i) => {
+        const dz = clsSholat[s.id]?.Dzuhur;
+        const dh = clsSholat[s.id]?.Dhuha;
+        const dzBadge = dz ? `<span class="badge ${dz.status === 'Jamaah' ? 'badge-success' : dz.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dz.status} (${dz.by || ''})</span>` : `<span class="badge">-</span>`;
+        const dhBadge = dh ? `<span class="badge ${dh.status === 'Jamaah' ? 'badge-success' : dh.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dh.status}</span>` : `<span class="badge">-</span>`;
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td class="mono">${s.nisn || s.id}</td>
+            <td><strong>${s.name}</strong></td>
+            <td>${dzBadge}</td>
+            <td>${dhBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportAgamaSholatCSV() {
+      const cls = document.getElementById('agamaSholatClassSelect').value || 'VIIA';
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const list = appData.masterStudents[cls] || [];
+      const clsSholat = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+      const rows = [['No','NISN','Nama Siswa','Kelas','Tanggal','Sholat Dzuhur','Sholat Dhuha']];
+      list.forEach((s, i) => {
+        rows.push([i + 1, s.nisn || s.id, `"${s.name}"`, cls, dateStr, clsSholat[s.id]?.Dzuhur?.status || 'Belum', clsSholat[s.id]?.Dhuha?.status || 'Belum']);
+      });
+      downloadCsvFile(rows, `Rekap_Sholat_${cls}_${dateStr}.csv`);
+    }
+
+    /* Rekap Mapel, Kelola Siswa & Verifikasi Izin */
+    function renderRekapAndStudents() {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const students = getFilteredWsStudents();
+      const att = (appData.roomAttendance[room.id] && appData.roomAttendance[room.id][dateStr]) || {};
+
+      let h = 0, s = 0, iz = 0, a = 0;
+      students.forEach(st => {
+        const r = att[st.id];
+        if (!r) return;
+        if (r.status === 'Hadir') h++;
+        else if (r.status === 'Sakit') s++;
+        else if (r.status === 'Izin Penting') iz++;
+        else if (r.status === 'Alpa') a++;
+      });
+
+      document.getElementById('wsStatsGrid').innerHTML = `
+        <div class="stat-card"><div class="stat-label">Total Siswa</div><div class="stat-value">${students.length}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--success);">Hadir</div><div class="stat-value" style="color:var(--success);">${h}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--info);">Sakit / Izin</div><div class="stat-value" style="color:var(--info);">${s + iz}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--danger);">Alpa</div><div class="stat-value" style="color:var(--danger);">${a}</div></div>
+      `;
+
+      // Tabel Verifikasi Izin
+      const activeCls = isEkskulRoom(room) ? null : document.getElementById('wsClassFilter').value;
+      const izins = appData.izinRequests.filter(item => !activeCls || item.cls === activeCls);
+      const pendingCnt = izins.filter(x => x.status === 'Menunggu Verifikasi').length;
+      document.getElementById('wsPendingIzinBadge').textContent = `${pendingCnt} Menunggu`;
+
+      document.getElementById('wsIzinTableBody').innerHTML = izins.length ? izins.map(item => `
+        <tr>
+          <td>${item.date}</td>
+          <td><strong>${item.studentName}</strong><div style="font-size:0.74rem; color:var(--text-muted);">${CLASS_LABELS[item.cls] || item.cls}</div></td>
+          <td><span class="badge ${item.type === 'Sakit' ? 'badge-info' : 'badge-warning'}">${item.type}</span><div style="font-size:0.76rem; margin-top:3px;">${item.reason}</div></td>
+          <td><button type="button" class="btn btn-outline btn-xs" onclick="openIzinPhotoModal('${item.id}')">🖼️ Lihat Foto</button></td>
+          <td>
+            ${item.status === 'Menunggu Verifikasi' ? `
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="btn btn-success btn-xs" onclick="verifyIzinRequest('${item.id}','Disetujui')">✅ Setujui</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="verifyIzinRequest('${item.id}','Ditolak')">✕ Tolak</button>
+              </div>
+            ` : `<span class="badge ${item.status === 'Disetujui' ? 'badge-success' : 'badge-danger'}">${item.status}</span>`}
+          </td>
+        </tr>
+      `).join('') : `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Belum ada pengajuan izin/sakit.</td></tr>`;
+
+      // Tabel Siswa Ruang
+      document.getElementById('rekapStudentTableBody').innerHTML = students.map((st, idx) => {
+        const r = att[st.id];
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="mono"><strong>${st.id}</strong><div style="font-size:0.72rem; color:var(--text-muted);">NISN: ${st.nisn || '-'}</div></td>
+            <td><strong>${st.name}</strong></td>
+            <td>${st.kelas} (Sesi ${st.sesi || 1})</td>
+            <td>${r ? `<span class="badge badge-teal">${r.status} (${r.time})</span>` : `<span class="badge">Belum Absen</span>`}</td>
+            <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteRoomStudent('${st.id}')">Hapus</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function verifyIzinRequest(izinId, decision) {
+      const item = appData.izinRequests.find(x => x.id === izinId);
+      if (!item) return;
+      item.status = decision;
+      if (decision === 'Disetujui') {
+        const room = appData.rooms.find(r => r.id === currentSession.roomId);
+        const list = appData.roomStudents[room.id] || [];
+        const match = list.find(s => normalizeClassCode(s.kelas) === item.cls && s.name === item.studentName);
+        if (match) {
+          if (!appData.roomAttendance[room.id]) appData.roomAttendance[room.id] = {};
+          if (!appData.roomAttendance[room.id][item.date]) appData.roomAttendance[room.id][item.date] = {};
+          appData.roomAttendance[room.id][item.date][match.id] = { status: item.type, time: 'Terverifikasi', note: item.reason };
+        }
+      }
+      saveAppData();
+      renderRekapAndStudents();
+      showToast('success', `Pengajuan Izin ${decision}`, item.studentName);
+    }
+
+    function openIzinPhotoModal(izinId) {
+      const item = appData.izinRequests.find(x => x.id === izinId);
+      if (!item) return;
+      document.getElementById('photoPreviewTitle').textContent = `📸 Bukti ${item.type} — ${item.studentName}`;
+      document.getElementById('photoPreviewCaption').textContent = `Kelas ${CLASS_LABELS[item.cls] || item.cls} • Tanggal ${item.date} • Alasan: ${item.reason}`;
+      document.getElementById('photoPreviewImg').src = item.photo;
+      openModal('photoPreviewModal');
+    }
+
+    function openAddStudentModal() {
+      document.getElementById('addStudentTargetMode').value = 'room';
+      document.getElementById('addStudentModalTitle').textContent = '+ Tambah Siswa ke Ruang Ini';
+      document.getElementById('newStudentName').value = '';
+      document.getElementById('newStudentNisn').value = '';
+      document.getElementById('newStudentSesiGroup').classList.remove('hidden');
+      const curCls = document.getElementById('wsClassFilter').value;
+      if (ALL_CLASSES.includes(curCls)) document.getElementById('newStudentClass').value = curCls;
+      openModal('addStudentModal');
+    }
+
+    function openAddMasterStudentModal() {
+      document.getElementById('addStudentTargetMode').value = 'master';
+      document.getElementById('addStudentModalTitle').textContent = '+ Tambah Siswa ke Bank Kelas Induk';
+      document.getElementById('newStudentName').value = '';
+      document.getElementById('newStudentNisn').value = '';
+      document.getElementById('newStudentSesiGroup').classList.add('hidden');
+      document.getElementById('newStudentClass').value = document.getElementById('adminMasterClassSelect').value;
+      openModal('addStudentModal');
+    }
+
+    function submitAddStudent(e) {
+      e.preventDefault();
+      const mode = document.getElementById('addStudentTargetMode').value;
+      const name = document.getElementById('newStudentName').value.trim().toUpperCase();
+      const cls = document.getElementById('newStudentClass').value;
+      const nisn = document.getElementById('newStudentNisn').value.trim() || `01189${Date.now().toString().slice(-5)}`;
+      const sesi = parseInt(document.getElementById('newStudentSesi').value, 10) || 1;
+
+      if (mode === 'master') {
+        if (!appData.masterStudents[cls]) appData.masterStudents[cls] = [];
+        const idx = appData.masterStudents[cls].length + 1;
+        appData.masterStudents[cls].push({ id: `${cls}-0${String(idx).padStart(2,'0')}`, nisn, name, kelas: cls, sesi });
+        saveAppData();
+        closeModal('addStudentModal');
+        renderAdminMasterClassTable();
+        showToast('success', 'Siswa Induk Ditambahkan', `${name} (${CLASS_LABELS[cls]})`);
+      } else {
+        const room = appData.rooms.find(r => r.id === currentSession.roomId);
+        if (!appData.roomStudents[room.id]) appData.roomStudents[room.id] = [];
+        const num = String(appData.roomStudents[room.id].length + 1).padStart(2, '0');
+        const code = isEkskulRoom(room) ? `${room.prefix}${sesi}-${num}` : `${room.prefix}-${cls}-${num}`;
+        appData.roomStudents[room.id].push({ id: code, nisn, name, kelas: cls, sesi });
+        saveAppData();
+        closeModal('addStudentModal');
+        refreshWorkspaceUI();
+        showToast('success', 'Siswa Ditambahkan', `${name} (${code})`);
+      }
+    }
+
+    function deleteRoomStudent(stId) {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      appData.roomStudents[room.id] = (appData.roomStudents[room.id] || []).filter(s => s.id !== stId);
+      saveAppData();
+      refreshWorkspaceUI();
+      showToast('success', 'Siswa Dihapus', stId);
+    }
+
+    function downloadImportTemplateCSV() {
+      const rows = [
+        ['Nama Lengkap', 'Kelas', 'NISN', 'Sesi'],
+        ['BUDI SANTOSO', 'VIIA', '0118910099', '1'],
+        ['SITI AMINAH', 'VIIA', '0118910100', '1']
+      ];
+      downloadCsvFile(rows, 'Template_Import_Siswa_SMPN1Tempuran.csv');
+    }
+
+    function importRoomStudentsCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const lines = (ev.target.result || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        let added = 0;
+        if (!appData.roomStudents[room.id]) appData.roomStudents[room.id] = [];
+        lines.forEach((line, idx) => {
+          const p = line.split(/[,;\t]+/).map(x => x.replace(/^["']|["']$/g, '').trim());
+          if (idx === 0 && p[0].toLowerCase().includes('nama')) return;
+          if (!p[0]) return;
+          const name = p[0].toUpperCase();
+          const cls = normalizeClassCode(p[1]) || 'VIIA';
+          const nisn = p[2] || `01189${String(10000 + added)}`;
+          const sesi = parseInt(p[3], 10) === 2 ? 2 : 1;
+          const num = String(appData.roomStudents[room.id].length + 1).padStart(2, '0');
+          const code = isEkskulRoom(room) ? `${room.prefix}${sesi}-${num}` : `${room.prefix}-${cls}-${num}`;
+          appData.roomStudents[room.id].push({ id: code, nisn, name, kelas: cls, sesi });
+          added++;
+        });
+        saveAppData();
+        refreshWorkspaceUI();
+        showToast('success', 'Import CSV Berhasil', `${added} siswa ditambahkan.`);
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function exportRoomAttendanceCSV() {
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const students = getFilteredWsStudents();
+      const att = (appData.roomAttendance[room.id] && appData.roomAttendance[room.id][dateStr]) || {};
+      const rows = [['No','Kode QR','NISN','Nama Siswa','Kelas','Tanggal','Status','Waktu']];
+      students.forEach((s, i) => {
+        const r = att[s.id];
+        rows.push([i + 1, s.id, s.nisn || '-', `"${s.name}"`, s.kelas, dateStr, r ? r.status : 'Belum Absen', r ? r.time : '-']);
+      });
+      downloadCsvFile(rows, `Rekap_${room.prefix}_${dateStr}.csv`);
+    }
+
+    /* Kartu QR ID Resmi SMPN 1 Tempuran */
+    function renderQrCards() {
+      const students = getFilteredWsStudents();
+      const grid = document.getElementById('qrCardsGrid');
+      const logoSrc = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
+
+      grid.innerHTML = students.map(s => `
+        <div class="id-card">
+          <div class="id-card-header">
+            <img src="${logoSrc}" alt="Logo SMPN 1 Tempuran" class="id-card-logo" />
+            <div class="id-card-school">
+              <h4>SMP NEGERI 1<br/>TEMPURAN</h4>
+              <p>Kartu Absensi Resmi dan Wajib Dibawa</p>
+            </div>
+          </div>
+          <div class="id-card-qr">${createQrSvg(s.id)}</div>
+          <div class="id-card-meta">
+            <div><span class="lbl">Nama</span><span>: </span><span class="val">${s.name.replace(/\s*\([IVX]+[A-G]\)$/, '')}</span></div>
+            <div><span class="lbl">Kelas</span><span>: </span><span class="val">${s.kelas}</span></div>
+            <div><span class="lbl">NISN</span><span>: </span><span class="val mono">${s.nisn || '-'}</span></div>
+            <div><span class="lbl">KD</span><span>: </span><span class="val mono">${s.id}</span></div>
+          </div>
+          <div class="id-card-footer">Kartu Ini Wajib Dijaga, Apabila Hilang Segera Lapor Wali Kelas</div>
+        </div>
+      `).join('');
+    }
+
+    function handleSchoolLogoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        appData.schoolLogo = ev.target.result;
+        saveAppData();
+        renderQrCards();
+        showToast('success', 'Logo Sekolah Diperbarui', 'Tampilan kartu ID langsung diperbarui.');
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    }
+
+    /* =====================================================================
+       4. PANEL ADMIN SEKOLAH & BANK DATA KELAS INDUK
+       ===================================================================== */
+    function createNewRoom(e) {
+      e.preventDefault();
+      const type = document.getElementById('adminNewRoomType').value;
+      const name = document.getElementById('adminNewRoomName').value.trim();
+      const teacher = document.getElementById('adminNewRoomTeacher').value.trim();
+      const prefix = document.getElementById('adminNewRoomPrefix').value.trim().toUpperCase();
+      const pin = document.getElementById('adminNewRoomPin').value.trim();
+      if (!name || !teacher || !prefix || !pin) return;
+
+      const newId = `room_${prefix.toLowerCase()}_${Date.now().toString(36)}`;
+      appData.rooms.push({ id: newId, type, name, teacher, prefix, pin });
+      saveAppData();
+
+      document.getElementById('adminNewRoomName').value = '';
+      document.getElementById('adminNewRoomTeacher').value = '';
+      document.getElementById('adminNewRoomPrefix').value = '';
+
+      populateLoginRoomDropdown();
+      const switcher = document.getElementById('adminRoomSwitcher');
+      if (switcher) {
+        switcher.innerHTML = appData.rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+        switcher.value = newId;
+        currentSession.roomId = newId;
+      }
+      renderAdminPanel();
+      showToast('success', 'Mata Pelajaran / Ekskul Ditambahkan', `${name} (PIN: ${pin})`);
+    }
+
+    function deleteRoom(roomId) {
+      if (appData.rooms.length <= 1) return;
+      appData.rooms = appData.rooms.filter(r => r.id !== roomId);
+      delete appData.roomStudents[roomId];
+      if (currentSession.roomId === roomId) currentSession.roomId = appData.rooms[0].id;
+      saveAppData();
+      populateLoginRoomDropdown();
+      renderAdminPanel();
+      showToast('success', 'Ruang Dihapus', roomId);
+    }
+
+    function renderAdminPanel() {
+      const mSel = document.getElementById('adminMasterClassSelect');
+      if (!mSel.options.length) {
+        mSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+      }
+      renderAdminMasterClassTable();
+
+      const tbody = document.getElementById('adminRoomsListBody');
+      tbody.innerHTML = appData.rooms.map(r => `
+        <tr>
+          <td><strong>${r.name}</strong></td>
+          <td><span class="badge badge-info">${r.type}</span></td>
+          <td>${r.teacher}</td>
+          <td class="mono">${r.pin}</td>
+          <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteRoom('${r.id}')">Hapus</button></td>
+        </tr>
+      `).join('') + `
+        <tr>
+          <td><strong>🕌 Guru Wali (Sholat Dzuhur)</strong></td>
+          <td><span class="badge badge-purple">Akun Khusus</span></td>
+          <td>${appData.guruWaliName}</td>
+          <td class="mono">${appData.guruWaliPin}</td>
+          <td><span class="badge badge-success">Aktif</span></td>
+        </tr>
+        <tr>
+          <td><strong>👩‍🏫 Wali Kelas (VIIA–IXG)</strong></td>
+          <td><span class="badge badge-purple">21 Wali Kelas</span></td>
+          <td>Semua Wali Kelas</td>
+          <td class="mono">2026</td>
+          <td><span class="badge badge-success">Aktif</span></td>
+        </tr>
+        <tr>
+          <td><strong>🧑‍⚕️ Guru BK (Kelas VII, VIII, IX)</strong></td>
+          <td><span class="badge badge-purple">3 Jenjang BK</span></td>
+          <td>Tim BK SMPN 1 Tempuran</td>
+          <td class="mono">3030</td>
+          <td><span class="badge badge-success">Aktif</span></td>
+        </tr>
+      `;
+    }
+
+    function renderAdminMasterClassTable() {
+      const cls = document.getElementById('adminMasterClassSelect').value || 'VIIA';
+      const list = appData.masterStudents[cls] || [];
+      document.getElementById('adminMasterClassBody').innerHTML = list.map(s => `
+        <tr>
+          <td class="mono">${s.id}</td>
+          <td class="mono">${s.nisn}</td>
+          <td><strong>${s.name}</strong></td>
+          <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteMasterStudent('${cls}','${s.id}')">✕</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function deleteMasterStudent(cls, stId) {
+      appData.masterStudents[cls] = (appData.masterStudents[cls] || []).filter(s => s.id !== stId);
+      saveAppData();
+      renderAdminMasterClassTable();
+    }
+
+    function downloadMasterTemplateCSV() {
+      const cls = document.getElementById('adminMasterClassSelect')?.value || 'VIIA';
+      const rows = [
+        ['Nama Lengkap', 'Kelas', 'NISN'],
+        ['BUDI SANTOSO', cls, '0118910099'],
+        ['SITI AMINAH', cls, '0118910100']
+      ];
+      downloadCsvFile(rows, `Template_Siswa_Induk_${cls}.csv`);
+    }
+
+    function importMasterStudentsCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const defaultCls = document.getElementById('adminMasterClassSelect')?.value || 'VIIA';
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const lines = (ev.target.result || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        let added = 0;
+        lines.forEach((line, idx) => {
+          const p = line.split(/[,;\t]+/).map(x => x.replace(/^["']|["']$/g, '').trim());
+          if (idx === 0 && p[0].toLowerCase().includes('nama')) return;
+          if (!p[0]) return;
+          const name = p[0].toUpperCase();
+          const normCls = normalizeClassCode(p[1]);
+          const targetCls = ALL_CLASSES.includes(normCls) ? normCls : defaultCls;
+          const nisn = p[2] || `01189${String(10000 + Math.floor(Math.random() * 89999))}`;
+
+          if (!appData.masterStudents[targetCls]) appData.masterStudents[targetCls] = [];
+          const exists = appData.masterStudents[targetCls].some(s => s.name === name);
+          if (!exists) {
+            const num = String(appData.masterStudents[targetCls].length + 1).padStart(2, '0');
+            appData.masterStudents[targetCls].push({
+              id: `${targetCls}-0${num}`,
+              nisn,
+              name,
+              kelas: targetCls,
+              sesi: 1
+            });
+            added++;
+          }
+        });
+        saveAppData();
+        renderAdminMasterClassTable();
+        showToast('success', 'Import Siswa Induk Selesai', `${added} siswa baru ditambahkan ke Bank Kelas Induk.`);
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function exportMasterStudentsCSV() {
+      const cls = document.getElementById('adminMasterClassSelect')?.value || 'VIIA';
+      const list = appData.masterStudents[cls] || [];
+      if (!list.length) {
+        showToast('error', 'Data Kosong', `Belum ada siswa di kelas ${CLASS_LABELS[cls]}.`);
+        return;
+      }
+      const rows = [['No', 'Kode Induk', 'NISN', 'Nama Lengkap', 'Kelas']];
+      list.forEach((s, i) => {
+        rows.push([i + 1, s.id, s.nisn || '-', `"${s.name}"`, cls]);
+      });
+      downloadCsvFile(rows, `Data_Siswa_Induk_${cls}.csv`);
+    }
+
+    function triggerModalCsvTemplate() {
+      const mode = document.getElementById('addStudentTargetMode')?.value || 'room';
+      if (mode === 'master') downloadMasterTemplateCSV();
+      else downloadImportTemplateCSV();
+    }
+
+    function triggerModalCsvImport() {
+      const mode = document.getElementById('addStudentTargetMode')?.value || 'room';
+      closeModal('addStudentModal');
+      if (mode === 'master') document.getElementById('masterCsvUpload')?.click();
+      else document.getElementById('roomCsvUpload')?.click();
+    }
+
+    function triggerModalCsvExport() {
+      const mode = document.getElementById('addStudentTargetMode')?.value || 'room';
+      if (mode === 'master') exportMasterStudentsCSV();
+      else exportRoomAttendanceCSV();
+    }
+
+    function backupAllJson() {
+      const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Backup_Absensi_SMPN1Tempuran_${getTodayISO()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function restoreAllJson(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          if (parsed && parsed.rooms && parsed.masterStudents) {
+            appData = parsed;
+            saveAppData();
+            applySessionView();
+            showToast('success', 'Restore Berhasil', 'Seluruh database dipulihkan.');
+          }
+        } catch (err) {
+          showToast('error', 'File JSON Tidak Valid', 'Gagal membaca file backup.');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    /* =====================================================================
+       5. WORKSPACE KHUSUS GURU WALI (SHOLAT DZUHUR SAJA)
+       ===================================================================== */
+    function setGuruWaliDzuhur(cls, stId, status) {
+      const dateStr = document.getElementById('guruWaliDateInput').value || getTodayISO();
+      if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
+      if (!appData.sholatAttendance[dateStr][cls]) appData.sholatAttendance[dateStr][cls] = {};
+      if (!appData.sholatAttendance[dateStr][cls][stId]) appData.sholatAttendance[dateStr][cls][stId] = {};
+      const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      appData.sholatAttendance[dateStr][cls][stId].Dzuhur = { status, time, by: 'Guru Wali' };
+      saveAppData();
+      refreshGuruWaliUI();
+    }
+
+    function processGuruWaliScan(code) {
+      const found = findStudentAcrossAllClasses(code);
+      if (!found) {
+        showToast('error', 'Siswa Tidak Ditemukan', `"${code}" tidak terdaftar.`);
+        return;
+      }
+      document.getElementById('gwClassSelect').value = found.cls;
+      setGuruWaliDzuhur(found.cls, found.student.id, 'Jamaah');
+      showToast('success', `Sholat Dzuhur: ${found.student.name}`, `Kelas ${CLASS_LABELS[found.cls]}`);
+    }
+
+    function handleGuruWaliManualScan(e) {
+      e.preventDefault();
+      const inp = document.getElementById('gwCodeInput');
+      if (!inp.value.trim()) return;
+      processGuruWaliScan(inp.value.trim());
+      inp.value = '';
+    }
+
+    function markAllGuruWaliJamaah() {
+      const cls = document.getElementById('gwClassSelect').value || 'VIIA';
+      const students = appData.masterStudents[cls] || [];
+      students.forEach(s => setGuruWaliDzuhur(cls, s.id, 'Jamaah'));
+      showToast('success', 'Jamaah Dzuhur Semua', `${students.length} siswa kelas ${CLASS_LABELS[cls]}`);
+    }
+
+    function refreshGuruWaliUI() {
+      const cls = document.getElementById('gwClassSelect').value || 'VIIA';
+      const dateStr = document.getElementById('guruWaliDateInput').value || getTodayISO();
+      const students = appData.masterStudents[cls] || [];
+      const clsMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+
+      let jamaahCnt = 0;
+      students.forEach(s => { if (clsMap[s.id]?.Dzuhur?.status === 'Jamaah') jamaahCnt++; });
+      document.getElementById('gwSummaryBadge').textContent = `Jamaah Dzuhur: ${jamaahCnt} / ${students.length} Siswa`;
+
+      document.getElementById('gwTableBody').innerHTML = students.map((s, idx) => {
+        const rec = clsMap[s.id]?.Dzuhur;
+        let badge = `<span class="badge">Belum</span>`;
+        if (rec) {
+          const bCls = rec.status === 'Jamaah' ? 'badge-success' : rec.status === 'Udzur' ? 'badge-purple' : 'badge-danger';
+          badge = `<span class="badge ${bCls}">${rec.status} (${rec.time})</span>`;
+        }
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.id}</div></td>
+            <td>${badge}</td>
+            <td>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="btn btn-success btn-xs" onclick="setGuruWaliDzuhur('${cls}','${s.id}','Jamaah')">Jamaah</button>
+                <button type="button" class="btn btn-purple btn-xs" onclick="setGuruWaliDzuhur('${cls}','${s.id}','Udzur')">Udzur</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="setGuruWaliDzuhur('${cls}','${s.id}','Tidak')">Tidak</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    /* =====================================================================
+       6. DASHBOARD LAPORAN TERPADU WALI KELAS & GURU BK (TANPA VERIFIKASI IZIN)
+       ===================================================================== */
+    function getActiveHomeroomClass() {
+      if (currentSession.role === 'guru_bk') {
+        return document.getElementById('bkClassSelector').value || `${currentSession.bkLevel}A`;
+      }
+      return currentSession.waliClass || 'VIIA';
+    }
+
+    function refreshHomeroomDashboard() {
+      const isBk = currentSession.role === 'guru_bk';
+      const cls = getActiveHomeroomClass();
+      const dateStr = document.getElementById('hrDateInput').value || getTodayISO();
+      const students = appData.masterStudents[cls] || [];
+
+      document.getElementById('hrRoleBadge').textContent = isBk ? `GURU BK KELAS ${currentSession.bkLevel}` : `WALI KELAS ${CLASS_LABELS[cls]}`;
+      document.getElementById('hrTitle').textContent = isBk
+        ? `Laporan Terpadu Guru BK — ${CLASS_LABELS[cls]}`
+        : `Laporan Terpadu — Wali Kelas ${CLASS_LABELS[cls]}`;
+      document.getElementById('hrIzinModeNote').textContent = isBk
+        ? 'Mode Pemantauan Guru BK (Hanya Baca)'
+        : 'Laporan Pengajuan Izin Siswa';
+
+      const pagiMap = appData.pagiAttendance?.[dateStr]?.[cls] || {};
+      const sholatMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+
+      let hadirPagi = 0, dzuhurJamaah = 0, totalMapelHadir = 0, totalMapelSia = 0, activeMapelCount = 0;
+
+      appData.rooms.forEach(room => {
+        const rAtt = appData.roomAttendance?.[room.id]?.[dateStr];
+        if (rAtt && Object.keys(rAtt).length > 0) activeMapelCount++;
+      });
+
+      document.getElementById('hrActiveMapelBadge').textContent = `${activeMapelCount} Mapel/Ekskul Mengisi Absen`;
+
+      const matrixHtml = students.map((st, idx) => {
+        const pRec = pagiMap[st.id];
+        if (pRec && (pRec.status === 'Hadir' || pRec.status === 'Telat')) hadirPagi++;
+
+        const dzRec = sholatMap[st.id]?.Dzuhur;
+        const dhRec = sholatMap[st.id]?.Dhuha;
+        if (dzRec && dzRec.status === 'Jamaah') dzuhurJamaah++;
+
+        let mH = 0, mS = 0, mI = 0, mA = 0;
+        appData.rooms.forEach(room => {
+          const rList = appData.roomStudents[room.id] || [];
+          const match = rList.find(x => normalizeClassCode(x.kelas) === cls && x.name === st.name);
+          if (match) {
+            const rRec = appData.roomAttendance?.[room.id]?.[dateStr]?.[match.id];
+            if (rRec) {
+              if (rRec.status === 'Hadir') { mH++; totalMapelHadir++; }
+              else if (rRec.status === 'Sakit') { mS++; totalMapelSia++; }
+              else if (rRec.status === 'Izin Penting') { mI++; totalMapelSia++; }
+              else if (rRec.status === 'Alpa') { mA++; totalMapelSia++; }
+            }
+          }
+        });
+
+        const pagiBadge = pRec ? `<span class="badge ${pRec.status === 'Hadir' ? 'badge-success' : 'badge-warning'}">${pRec.status} (${pRec.time})</span>` : `<span class="badge">-</span>`;
+        const dzBadge = dzRec ? `<span class="badge ${dzRec.status === 'Jamaah' ? 'badge-success' : dzRec.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dzRec.status}</span>` : `<span class="badge">-</span>`;
+        const dhBadge = dhRec ? `<span class="badge ${dhRec.status === 'Jamaah' ? 'badge-success' : dhRec.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dhRec.status}</span>` : `<span class="badge">-</span>`;
+
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="mono">${st.nisn || st.id}</td>
+            <td><strong>${st.name}</strong></td>
+            <td>${pagiBadge}</td>
+            <td>${dzBadge}</td>
+            <td>${dhBadge}</td>
+            <td>
+              <span class="badge badge-success">H:${mH}</span>
+              <span class="badge badge-info">S:${mS}</span>
+              <span class="badge badge-warning">I:${mI}</span>
+              <span class="badge badge-danger">A:${mA}</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('hrMatrixTableBody').innerHTML = matrixHtml;
+      document.getElementById('hrStatsGrid').innerHTML = `
+        <div class="stat-card"><div class="stat-label">Total Siswa ${cls}</div><div class="stat-value">${students.length}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--success);">Hadir Absen Pagi</div><div class="stat-value" style="color:var(--success);">${hadirPagi}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--purple);">Jamaah Sholat Dzuhur</div><div class="stat-value" style="color:var(--purple);">${dzuhurJamaah}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--danger);">Total S / I / A Mapel</div><div class="stat-value" style="color:var(--danger);">${totalMapelSia}</div></div>
+      `;
+
+      // Daftar Izin (Hanya baca bagi Wali Kelas & Guru BK)
+      const izins = appData.izinRequests.filter(x => x.cls === cls);
+      document.getElementById('hrIzinTableBody').innerHTML = izins.length ? izins.map(item => `
+        <tr>
+          <td>${item.date}</td>
+          <td><strong>${item.studentName}</strong></td>
+          <td><span class="badge ${item.type === 'Sakit' ? 'badge-info' : 'badge-warning'}">${item.type}</span> — ${item.reason}</td>
+          <td><button type="button" class="btn btn-outline btn-xs" onclick="openIzinPhotoModal('${item.id}')">🖼️ Lihat Foto</button></td>
+          <td><span class="badge ${item.status === 'Disetujui' ? 'badge-success' : item.status === 'Ditolak' ? 'badge-danger' : 'badge-warning'}">${item.status}</span></td>
+        </tr>
+      `).join('') : `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Belum ada pengajuan izin untuk kelas ${CLASS_LABELS[cls]}.</td></tr>`;
+    }
+
+    function exportHomeroomCSV() {
+      const cls = getActiveHomeroomClass();
+      const dateStr = document.getElementById('hrDateInput').value || getTodayISO();
+      const students = appData.masterStudents[cls] || [];
+      const pagiMap = appData.pagiAttendance?.[dateStr]?.[cls] || {};
+      const sholatMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+
+      const rows = [['No','NISN','Nama Siswa','Kelas','Tanggal','Absen Pagi','Sholat Dzuhur','Sholat Dhuha']];
+      students.forEach((st, i) => {
+        rows.push([
+          i + 1,
+          st.nisn || st.id,
+          `"${st.name}"`,
+          cls,
+          dateStr,
+          pagiMap[st.id]?.status || 'Belum',
+          sholatMap[st.id]?.Dzuhur?.status || 'Belum',
+          sholatMap[st.id]?.Dhuha?.status || 'Belum'
+        ]);
+      });
+      downloadCsvFile(rows, `Laporan_Terpadu_${cls}_${dateStr}.csv`);
+    }
+
+    function downloadCsvFile(rows, filename) {
+      const csv = '\uFEFF' + rows.map(r => r.join(';')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('success', 'File CSV Diunduh', filename);
+    }
+
+    /* =====================================================================
+       INISIALISASI AWAL
+       ===================================================================== */
+    window.onload = function() {
+      loadAppData();
+      const today = getTodayISO();
+      document.getElementById('pagiDateInput').value = today;
+      document.getElementById('izinDateInput').value = today;
+      document.getElementById('wsDateInput').value = today;
+
+      const classOpts = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+      document.getElementById('pagiClassSelect').innerHTML = classOpts;
+      document.getElementById('izinClassSelect').innerHTML = classOpts;
+      document.getElementById('gwClassSelect').innerHTML = classOpts;
+      document.getElementById('loginWaliClassSelect').innerHTML = classOpts;
+      document.getElementById('newStudentClass').innerHTML = classOpts;
+
+      populateIzinStudentsByClass();
+      applySessionView();
+    };
+  </script>
+</body>
+</html>
