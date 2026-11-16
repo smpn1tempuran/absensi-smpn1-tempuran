@@ -1552,7 +1552,10 @@
        ===================================================================== */
     function stopAllCameras() {
       if (activeScanInterval) { clearInterval(activeScanInterval); activeScanInterval = null; }
-      if (activeCameraStream) { activeCameraStream.getTracks().forEach(t => t.stop()); activeCameraStream = null; }
+      if (activeCameraStream) {
+        try { activeCameraStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        activeCameraStream = null;
+      }
       ['pagi', 'ws', 'sholat', 'gw'].forEach(prefix => {
         const v = document.getElementById(`${prefix}Video`);
         const ov = document.getElementById(`${prefix}Overlay`);
@@ -1560,7 +1563,11 @@
         const capPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
         const bStart = document.getElementById(`btnStart${capPrefix}Cam`);
         const bStop = document.getElementById(`btnStop${capPrefix}Cam`);
-        if (v) { v.srcObject = null; v.classList.add('hidden'); }
+        if (v) {
+          try { v.pause(); } catch (e) {}
+          v.srcObject = null;
+          v.classList.add('hidden');
+        }
         if (ov) ov.classList.add('hidden');
         if (ph) ph.classList.remove('hidden');
         if (bStart) bStart.classList.remove('hidden');
@@ -1568,9 +1575,34 @@
       });
     }
 
+    async function acquireCameraStreamWithFallback() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Browser tidak mendukung akses kamera atau halaman tidak dibuka lewat HTTPS.');
+      }
+      const attempts = [
+        { video: { facingMode: { ideal: 'environment' } }, audio: false },
+        { video: { facingMode: 'environment' }, audio: false },
+        { video: true, audio: false }
+      ];
+      let lastError = null;
+      for (const constraints of attempts) {
+        try {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+          lastError = err;
+          if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+            throw err;
+          }
+        }
+      }
+      throw lastError || new Error('Perangkat kamera tidak ditemukan.');
+    }
+
     async function startQrCamera(mode) {
       stopAllCameras();
       stopIzinCamera();
+      await new Promise(r => setTimeout(r, 150));
+
       const v = document.getElementById(`${mode}Video`);
       const ov = document.getElementById(`${mode}Overlay`);
       const ph = document.getElementById(`${mode}CamPlaceholder`);
@@ -1578,11 +1610,17 @@
       const bStart = document.getElementById(`btnStart${cap}Cam`);
       const bStop = document.getElementById(`btnStop${cap}Cam`);
 
+      if (!v) return;
+
       try {
-        activeCameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        activeCameraStream = await acquireCameraStreamWithFallback();
+        v.setAttribute('playsinline', '');
+        v.setAttribute('muted', '');
+        v.muted = true;
         v.srcObject = activeCameraStream;
-        await v.play();
         v.classList.remove('hidden');
+        await v.play();
+
         if (ov) ov.classList.remove('hidden');
         if (ph) ph.classList.add('hidden');
         if (bStart) bStart.classList.add('hidden');
@@ -1630,7 +1668,13 @@
           } catch (e) {}
         }, 280);
       } catch (err) {
-        showToast('error', 'Kamera Tidak Dapat Dibuka', 'Pastikan izin kamera diaktifkan atau ketik kode siswa secara manual.');
+        stopAllCameras();
+        const reason = (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'))
+          ? 'Izin kamera diblokir browser. Klik ikon pengaturan/gembok di samping alamat web lalu pilih Izinkan Kamera.'
+          : (err && err.name === 'NotReadableError')
+          ? 'Kamera sedang dipakai oleh aplikasi lain. Tutup aplikasi kamera lain lalu coba lagi.'
+          : `Kamera tidak dapat dibuka (${err?.message || 'Periksa izin kamera'}). Buka tautan langsung di Google Chrome.`;
+        showToast('error', 'Kamera Tidak Dapat Dibuka', reason);
       }
     }
 
