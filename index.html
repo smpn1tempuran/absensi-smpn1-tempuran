@@ -465,7 +465,7 @@
       </div>
 
       <div class="header-actions">
-        <span id="cloudSyncPill" class="role-pill pill-guest" title="Status Sinkronisasi Antar Perangkat">⏳ Menghubungkan Cloud...</span>
+        <span id="cloudSyncPill" class="role-pill pill-guest" title="Status Sinkronisasi Google Sheets Cloud">⏳ Menghubungkan Cloud...</span>
         <span id="roleBadge" class="role-pill pill-guest">Mode Publik / Siswa</span>
         <button type="button" id="btnOpenLogin" class="btn btn-sm" onclick="openLoginModal()">🔐 Login Guru / Wali / Admin</button>
         <button type="button" id="btnLogout" class="btn btn-danger btn-sm hidden" onclick="logoutRole()">🚪 Keluar</button>
@@ -941,19 +941,20 @@
 
         <div class="card" style="margin-top:1rem;">
           <div class="card-header">
-            <h3>☁️ Pengaturan Sinkronisasi Cloud Real-Time (GitHub Pages &amp; Multi-Perangkat)</h3>
-            <span id="adminCloudStatusBadge" class="badge badge-info">Status Cloud</span>
+            <h3>☁️ Sinkronisasi Google Sheets Cloud Real-Time (Apps Script)</h3>
+            <span id="adminCloudStatusBadge" class="badge badge-success">🟢 Google Sheets Cloud Aktif</span>
           </div>
           <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
-            Agar hasil scan di HP langsung muncul otomatis di laptop/komputer lain saat dibuka dari <strong>GitHub Pages</strong>, tempelkan konfigurasi <strong>Firebase Web App (JSON)</strong> milik sekolah di bawah ini lalu klik simpan.
+            Aplikasi sudah terhubung otomatis dengan server <strong>Google Apps Script &amp; Google Sheets</strong> sekolah. Setiap absensi dari HP langsung muncul di komputer/laptop lain secara otomatis.
           </p>
           <div class="form-group">
-            <label for="adminFirebaseConfigInput">Konfigurasi Firebase Web App (JSON)</label>
-            <textarea id="adminFirebaseConfigInput" rows="4" class="form-control mono" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+            <label for="adminAppsScriptUrlInput">URL Web App Google Apps Script (/exec)</label>
+            <input type="url" id="adminAppsScriptUrlInput" class="form-control mono" placeholder="https://script.google.com/macros/s/.../exec" />
           </div>
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-            <button type="button" class="btn btn-primary btn-sm" onclick="saveExternalCloudConfig()">☁️ Simpan &amp; Aktifkan Sinkronisasi Real-Time</button>
-            <button type="button" class="btn btn-success btn-sm" onclick="forcePushLocalToCloud()">⬆️ Kirim Data Perangkat Ini ke Cloud</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveAppsScriptUrlConfig()">☁️ Simpan &amp; Hubungkan Ulang</button>
+            <button type="button" class="btn btn-info btn-sm" onclick="pullStateFromAppsScript(true)">⬇️ Tarik Data Terbaru dari Cloud</button>
+            <button type="button" class="btn btn-success btn-sm" onclick="pushStateToAppsScript(true)">⬆️ Kirim Data Perangkat Ini ke Cloud</button>
           </div>
         </div>
       </section>
@@ -1202,101 +1203,17 @@
   <!-- TOAST CONTAINER -->
   <div id="toastContainer" class="toast-wrap"></div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    window.__cloudBridge = {
-      ready: false,
-      db: null,
-      auth: null,
-      docRef: null,
-      unsub: null,
-      lastPushedHash: '',
-
-      async connect(customConfigObj = null) {
-        try {
-          if (this.unsub) { this.unsub(); this.unsub = null; }
-          let cfg = customConfigObj;
-          if (!cfg && typeof __firebase_config !== 'undefined' && __firebase_config) {
-            cfg = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-          }
-          if (!cfg && window.__savedCloudConfig) {
-            cfg = window.__savedCloudConfig;
-          }
-          if (!cfg || !cfg.apiKey || !cfg.projectId) {
-            window.updateCloudPillUI('offline', '⚠️ Mode Lokal (Belum Terhubung Cloud)');
-            return false;
-          }
-
-          const app = initializeApp(cfg, 'smpn1tempuran_sync_' + Date.now());
-          this.auth = getAuth(app);
-          this.db = getFirestore(app);
-
-          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-            await signInWithCustomToken(this.auth, __initial_auth_token);
-          } else {
-            await signInAnonymously(this.auth);
-          }
-
-          if (!this.auth.currentUser) return false;
-
-          const appId = typeof __app_id !== 'undefined' ? __app_id : 'smpn1tempuran-absensi';
-          this.docRef = doc(this.db, 'artifacts', appId, 'public', 'data', 'school_state', 'main');
-          this.ready = true;
-          window.updateCloudPillUI('online', '🟢 Cloud Real-Time Aktif');
-
-          this.unsub = onSnapshot(this.docRef, (snap) => {
-            if (snap.exists()) {
-              const incoming = snap.data();
-              if (incoming && incoming.payload) {
-                if (incoming.payload !== this.lastPushedHash) {
-                  this.lastPushedHash = incoming.payload;
-                  window.applyIncomingCloudState(incoming.payload);
-                }
-              }
-            } else {
-              window.pushStateToCloud(true);
-            }
-          }, (err) => {
-            window.updateCloudPillUI('offline', '⚠️ Gangguan Koneksi Cloud');
-          });
-
-          return true;
-        } catch (err) {
-          window.updateCloudPillUI('offline', '⚠️ Gagal Koneksi Cloud');
-          return false;
-        }
-      },
-
-      async push(jsonStr) {
-        if (!this.ready || !this.docRef || !this.auth?.currentUser) return;
-        if (jsonStr === this.lastPushedHash) return;
-        try {
-          this.lastPushedHash = jsonStr;
-          await setDoc(this.docRef, {
-            payload: jsonStr,
-            updatedAt: Date.now()
-          });
-        } catch (e) {}
-      }
-    };
-
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => { window.__cloudBridge.connect(); }, 200);
-    });
-  </script>
-
   <script>
     /**
      * =========================================================================
      * SISTEM ABSENSI DIGITAL TERPADU - SMP NEGERI 1 TEMPURAN
+     * TERHUBUNG REAL-TIME KE GOOGLE APPS SCRIPT & GOOGLE SHEETS
      * =========================================================================
      */
 
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0COq3rIN9FyQqGPNRjbJVUEE0U2TYYlTnUczHbmqDqITBjYArmoFS2WJg4un2DVxI/exec';
     const STORAGE_KEY = 'smpn1tempuran_terpadu_v5';
-    const CLOUD_CFG_KEY = 'smpn1tempuran_cloud_cfg_v1';
+    const APPS_SCRIPT_URL_KEY = 'smpn1tempuran_apps_script_url_v1';
 
     const ALL_CLASSES = [
       'VIIA', 'VIIB', 'VIIC', 'VIID', 'VIIE', 'VIIF', 'VIIG',
@@ -1391,6 +1308,10 @@
     let capturedIzinDataUrl = null;
     let lastQrHit = { code: '', time: 0 };
 
+    function getAppsScriptUrl() {
+      return localStorage.getItem(APPS_SCRIPT_URL_KEY) || DEFAULT_APPS_SCRIPT_URL;
+    }
+
     function loadAppData() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -1433,35 +1354,21 @@
           sholatAttendance: {},
           izinRequests: []
         };
-        saveAppData();
+        saveAppData(true);
       }
       if (!appData.schoolLogo) appData.schoolLogo = DEFAULT_SCHOOL_LOGO_SVG;
       if (!appData.guruWaliPin) appData.guruWaliPin = '4040';
       if (!appData.bkPins) appData.bkPins = { VII: '3030', VIII: '3030', IX: '3030' };
-      try {
-        const savedCfg = localStorage.getItem(CLOUD_CFG_KEY);
-        if (savedCfg) window.__savedCloudConfig = JSON.parse(savedCfg);
-      } catch (e) {}
     }
 
+    /* =====================================================================
+       SINKRONISASI REAL-TIME GOOGLE APPS SCRIPT & GOOGLE SHEETS
+       ===================================================================== */
     let cloudPushTimer = null;
+    let lastCloudSnapshotHash = '';
+    let isSyncingFromCloud = false;
 
-    function saveAppData(skipCloud = false) {
-      const serialized = JSON.stringify(appData);
-      try {
-        localStorage.setItem(STORAGE_KEY, serialized);
-      } catch (e) {}
-      if (!skipCloud) {
-        clearTimeout(cloudPushTimer);
-        cloudPushTimer = setTimeout(() => {
-          if (window.__cloudBridge && window.__cloudBridge.ready) {
-            window.__cloudBridge.push(serialized);
-          }
-        }, 250);
-      }
-    }
-
-    window.updateCloudPillUI = function(status, text) {
+    function updateCloudPillUI(status, text) {
       const pill = document.getElementById('cloudSyncPill');
       const adminBadge = document.getElementById('adminCloudStatusBadge');
       if (pill) {
@@ -1472,68 +1379,104 @@
         adminBadge.textContent = text;
         adminBadge.className = status === 'online' ? 'badge badge-success' : 'badge badge-warning';
       }
-    };
+    }
 
-    window.pushStateToCloud = function(force = false) {
-      if (!appData) return;
+    function saveAppData(skipCloud = false) {
       const serialized = JSON.stringify(appData);
-      if (force && window.__cloudBridge) window.__cloudBridge.lastPushedHash = '';
-      if (window.__cloudBridge && window.__cloudBridge.ready) {
-        window.__cloudBridge.push(serialized);
-      }
-    };
-
-    window.applyIncomingCloudState = function(serializedPayload) {
       try {
-        const incoming = JSON.parse(serializedPayload);
-        if (!incoming || !incoming.rooms || !incoming.masterStudents) return;
-        appData = incoming;
-        localStorage.setItem(STORAGE_KEY, serializedPayload);
-
-        const role = currentSession.role;
-        if (role === 'public') {
-          refreshPagiUI();
-        } else if (role === 'guru' || role === 'admin') {
-          refreshWorkspaceUI();
-          if (!document.getElementById('wsTabAgamaRekap').classList.contains('hidden')) renderAgamaSholatRekap();
-          if (!document.getElementById('wsTabAdmin').classList.contains('hidden')) renderAdminPanel();
-        } else if (role === 'guru_wali') {
-          refreshGuruWaliUI();
-        } else if (role === 'wali_kelas' || role === 'guru_bk') {
-          refreshHomeroomDashboard();
-        }
+        localStorage.setItem(STORAGE_KEY, serialized);
       } catch (e) {}
-    };
-
-    async function saveExternalCloudConfig() {
-      const raw = document.getElementById('adminFirebaseConfigInput').value.trim();
-      try {
-        const parsed = JSON.parse(raw);
-        if (!parsed.apiKey || !parsed.projectId) {
-          showToast('error', 'Format JSON Kurang Lengkap', 'Pastikan berisi apiKey dan projectId.');
-          return;
-        }
-        window.__savedCloudConfig = parsed;
-        localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(parsed));
-        const ok = await window.__cloudBridge.connect(parsed);
-        if (ok) {
-          window.pushStateToCloud(true);
-          showToast('success', 'Cloud Real-Time Aktif!', 'Semua perangkat kini tersinkronisasi otomatis.');
-        } else {
-          showToast('error', 'Gagal Menghubungkan Cloud', 'Periksa kembali konfigurasi Firebase Anda.');
-        }
-      } catch (e) {
-        showToast('error', 'JSON Tidak Valid', 'Pastikan tanda kutip dan kurung kurawal sesuai format JSON.');
+      if (!skipCloud) {
+        clearTimeout(cloudPushTimer);
+        cloudPushTimer = setTimeout(() => {
+          pushStateToAppsScript(false);
+        }, 300);
       }
     }
 
-    function forcePushLocalToCloud() {
-      if (!window.__cloudBridge || !window.__cloudBridge.ready) {
-        showToast('error', 'Cloud Belum Aktif', 'Simpan konfigurasi Cloud terlebih dahulu.');
+    async function pushStateToAppsScript(notifyUser = false) {
+      const url = getAppsScriptUrl();
+      if (!url || !appData) return;
+      const serialized = JSON.stringify(appData);
+      if (!notifyUser && serialized === lastCloudSnapshotHash) return;
+
+      try {
+        updateCloudPillUI('online', '🔄 Menyinkronkan...');
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: serialized
+        });
+        lastCloudSnapshotHash = serialized;
+        updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
+        if (notifyUser) {
+          showToast('success', 'Data Terkirim ke Google Sheets', 'Perangkat lain akan otomatis memperbarui tampilan.');
+        }
+      } catch (e) {
+        updateCloudPillUI('offline', '⚠️ Gagal Kirim Cloud');
+      }
+    }
+
+    async function pullStateFromAppsScript(notifyUser = false) {
+      const url = getAppsScriptUrl();
+      if (!url || isSyncingFromCloud) return;
+      isSyncingFromCloud = true;
+      try {
+        const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const text = await res.text();
+        const trimmed = (text || '').trim();
+
+        if (!trimmed || trimmed === '{}') {
+          updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
+          await pushStateToAppsScript(false);
+          return;
+        }
+
+        const incoming = JSON.parse(trimmed);
+        if (incoming && Array.isArray(incoming.rooms) && incoming.masterStudents) {
+          updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
+          if (trimmed !== lastCloudSnapshotHash) {
+            lastCloudSnapshotHash = trimmed;
+            appData = incoming;
+            localStorage.setItem(STORAGE_KEY, trimmed);
+            rerenderActiveRoleView();
+          }
+          if (notifyUser) {
+            showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Google Sheets sudah dimuat.');
+          }
+        }
+      } catch (err) {
+        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cek Koneksi)');
+      } finally {
+        isSyncingFromCloud = false;
+      }
+    }
+
+    function rerenderActiveRoleView() {
+      const role = currentSession.role;
+      if (role === 'public') {
+        refreshPagiUI();
+      } else if (role === 'guru' || role === 'admin') {
+        refreshWorkspaceUI();
+        if (!document.getElementById('wsTabAgamaRekap').classList.contains('hidden')) renderAgamaSholatRekap();
+        if (!document.getElementById('wsTabAdmin').classList.contains('hidden')) renderAdminPanel();
+      } else if (role === 'guru_wali') {
+        refreshGuruWaliUI();
+      } else if (role === 'wali_kelas' || role === 'guru_bk') {
+        refreshHomeroomDashboard();
+      }
+    }
+
+    function saveAppsScriptUrlConfig() {
+      const val = document.getElementById('adminAppsScriptUrlInput').value.trim();
+      if (!val || !val.startsWith('https://script.google.com/')) {
+        showToast('error', 'URL Tidak Valid', 'Masukkan URL Web App Apps Script yang berakhiran /exec');
         return;
       }
-      window.pushStateToCloud(true);
-      showToast('success', 'Data Terkirim ke Cloud', 'Perangkat lain akan otomatis memperbarui tampilan.');
+      localStorage.setItem(APPS_SCRIPT_URL_KEY, val);
+      pullStateFromAppsScript(true);
     }
 
     function showToast(type, title, desc = '') {
@@ -1833,8 +1776,8 @@
       const v = document.getElementById('izinVideo');
       if (!v || v.readyState < 2) return;
       const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = Math.round((v.videoHeight / v.videoWidth) * 640) || 480;
+      canvas.width = 480;
+      canvas.height = Math.round((v.videoHeight / v.videoWidth) * 480) || 360;
       const ctx = canvas.getContext('2d');
       if (izinFacingMode === 'user') {
         ctx.translate(canvas.width, 0);
@@ -1855,12 +1798,12 @@
       const stId = document.getElementById('izinStudentSelect').value;
       const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
       ctx.fillStyle = 'rgba(6, 15, 38, 0.78)';
-      ctx.fillRect(0, canvas.height - 34, canvas.width, 34);
+      ctx.fillRect(0, canvas.height - 28, canvas.width, 28);
       ctx.fillStyle = '#fde047';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText(`SMPN 1 TEMPURAN • ${st ? st.name : stId} • ${new Date().toLocaleString('id-ID')}`, 10, canvas.height - 12);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`SMPN 1 TEMPURAN • ${st ? st.name : stId} • ${new Date().toLocaleString('id-ID')}`, 8, canvas.height - 10);
 
-      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.55);
       const prev = document.getElementById('izinCapturedPreview');
       prev.src = capturedIzinDataUrl;
       prev.classList.remove('hidden');
@@ -1892,6 +1835,9 @@
         photo: capturedIzinDataUrl,
         status: 'Menunggu Verifikasi'
       });
+      if (appData.izinRequests.length > 35) {
+        appData.izinRequests = appData.izinRequests.slice(0, 35);
+      }
       saveAppData();
 
       e.target.reset();
@@ -2679,9 +2625,9 @@
       if (!mSel.options.length) {
         mSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
       }
-      const cfgBox = document.getElementById('adminFirebaseConfigInput');
-      if (cfgBox && !cfgBox.value && window.__savedCloudConfig) {
-        cfgBox.value = JSON.stringify(window.__savedCloudConfig, null, 2);
+      const urlInp = document.getElementById('adminAppsScriptUrlInput');
+      if (urlInp && !urlInp.value) {
+        urlInp.value = getAppsScriptUrl();
       }
       renderAdminMasterClassTable();
 
@@ -3062,7 +3008,7 @@
     }
 
     /* =====================================================================
-       INISIALISASI AWAL
+       INISIALISASI AWAL & POLLING SINKRONISASI REAL-TIME
        ===================================================================== */
     window.onload = function() {
       loadAppData();
@@ -3080,6 +3026,13 @@
 
       populateIzinStudentsByClass();
       applySessionView();
+
+      pullStateFromAppsScript(false);
+      setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          pullStateFromAppsScript(false);
+        }
+      }, 4500);
     };
   </script>
 </body>
