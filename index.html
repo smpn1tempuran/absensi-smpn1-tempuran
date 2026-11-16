@@ -945,7 +945,7 @@
             <span id="adminCloudStatusBadge" class="badge badge-success">🟢 Google Sheets Cloud Aktif</span>
           </div>
           <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
-            Aplikasi sudah terhubung otomatis dengan server <strong>Google Apps Script &amp; Google Sheets</strong> sekolah. Setiap absensi dari HP langsung muncul di komputer/laptop lain secara otomatis.
+            Aplikasi terhubung dengan <strong>Google Apps Script &amp; Google Sheets</strong> sekolah. Gunakan tombol di bawah untuk menguji pengiriman atau penarikan data secara langsung.
           </p>
           <div class="form-group">
             <label for="adminAppsScriptUrlInput">URL Web App Google Apps Script (/exec)</label>
@@ -954,7 +954,7 @@
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <button type="button" class="btn btn-primary btn-sm" onclick="saveAppsScriptUrlConfig()">☁️ Simpan &amp; Hubungkan Ulang</button>
             <button type="button" class="btn btn-info btn-sm" onclick="pullStateFromAppsScript(true)">⬇️ Tarik Data Terbaru dari Cloud</button>
-            <button type="button" class="btn btn-success btn-sm" onclick="pushStateToAppsScript(true)">⬆️ Kirim Data Perangkat Ini ke Cloud</button>
+            <button type="button" class="btn btn-success btn-sm" onclick="pushStateToAppsScript(true)">⬆️ Kirim &amp; Uji Simpan ke Cloud</button>
           </div>
         </div>
       </section>
@@ -1207,7 +1207,7 @@
     /**
      * =========================================================================
      * SISTEM ABSENSI DIGITAL TERPADU - SMP NEGERI 1 TEMPURAN
-     * TERHUBUNG REAL-TIME KE GOOGLE APPS SCRIPT & GOOGLE SHEETS
+     * TERHUBUNG REAL-TIME KE GOOGLE APPS SCRIPT & GOOGLE SHEETS (MULTI-CELL)
      * =========================================================================
      */
 
@@ -1348,7 +1348,7 @@
           schoolLogo: DEFAULT_SCHOOL_LOGO_SVG,
           rooms: JSON.parse(JSON.stringify(DEFAULT_ROOMS)),
           masterStudents,
-          roomStudents: { ekstul_kd: kdStudents, ekskul_kd: kdStudents },
+          roomStudents: { ekskul_kd: kdStudents },
           pagiAttendance: {},
           roomAttendance: {},
           sholatAttendance: {},
@@ -1390,7 +1390,7 @@
         clearTimeout(cloudPushTimer);
         cloudPushTimer = setTimeout(() => {
           pushStateToAppsScript(false);
-        }, 300);
+        }, 250);
       }
     }
 
@@ -1405,16 +1405,18 @@
         await fetch(url, {
           method: 'POST',
           mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: serialized
         });
         lastCloudSnapshotHash = serialized;
         updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
         if (notifyUser) {
-          showToast('success', 'Data Terkirim ke Google Sheets', 'Perangkat lain akan otomatis memperbarui tampilan.');
+          showToast('success', 'Data Terkirim ke Google Sheets', 'Cek sel A1/B1 di Google Sheets Anda — data telah tersimpan!');
         }
       } catch (e) {
         updateCloudPillUI('offline', '⚠️ Gagal Kirim Cloud');
+        if (notifyUser) {
+          showToast('error', 'Gagal Mengirim ke Cloud', e.message || 'Periksa izin akses "Siapa saja" pada Apps Script.');
+        }
       }
     }
 
@@ -1448,7 +1450,10 @@
           }
         }
       } catch (err) {
-        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cek Koneksi)');
+        updateCloudPillUI('offline', '⚠️ Belum Terbaca dari Cloud');
+        if (notifyUser) {
+          showToast('error', 'Gagal Membaca Google Sheets', 'Pastikan deployment Apps Script diatur ke "Siapa saja" (Anyone) dan sudah memakai Versi baru.');
+        }
       } finally {
         isSyncingFromCloud = false;
       }
@@ -1776,8 +1781,8 @@
       const v = document.getElementById('izinVideo');
       if (!v || v.readyState < 2) return;
       const canvas = document.createElement('canvas');
-      canvas.width = 480;
-      canvas.height = Math.round((v.videoHeight / v.videoWidth) * 480) || 360;
+      canvas.width = 420;
+      canvas.height = Math.round((v.videoHeight / v.videoWidth) * 420) || 315;
       const ctx = canvas.getContext('2d');
       if (izinFacingMode === 'user') {
         ctx.translate(canvas.width, 0);
@@ -1798,12 +1803,12 @@
       const stId = document.getElementById('izinStudentSelect').value;
       const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
       ctx.fillStyle = 'rgba(6, 15, 38, 0.78)';
-      ctx.fillRect(0, canvas.height - 28, canvas.width, 28);
+      ctx.fillRect(0, canvas.height - 26, canvas.width, 26);
       ctx.fillStyle = '#fde047';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(`SMPN 1 TEMPURAN • ${st ? st.name : stId} • ${new Date().toLocaleString('id-ID')}`, 8, canvas.height - 10);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(`SMPN 1 TEMPURAN • ${st ? st.name : stId} • ${new Date().toLocaleString('id-ID')}`, 8, canvas.height - 9);
 
-      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.55);
+      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.45);
       const prev = document.getElementById('izinCapturedPreview');
       prev.src = capturedIzinDataUrl;
       prev.classList.remove('hidden');
@@ -1835,8 +1840,8 @@
         photo: capturedIzinDataUrl,
         status: 'Menunggu Verifikasi'
       });
-      if (appData.izinRequests.length > 35) {
-        appData.izinRequests = appData.izinRequests.slice(0, 35);
+      if (appData.izinRequests.length > 25) {
+        appData.izinRequests = appData.izinRequests.slice(0, 25);
       }
       saveAppData();
 
