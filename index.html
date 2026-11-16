@@ -465,6 +465,7 @@
       </div>
 
       <div class="header-actions">
+        <span id="cloudSyncPill" class="role-pill pill-guest" title="Status Sinkronisasi Antar Perangkat">⏳ Menghubungkan Cloud...</span>
         <span id="roleBadge" class="role-pill pill-guest">Mode Publik / Siswa</span>
         <button type="button" id="btnOpenLogin" class="btn btn-sm" onclick="openLoginModal()">🔐 Login Guru / Wali / Admin</button>
         <button type="button" id="btnLogout" class="btn btn-danger btn-sm hidden" onclick="logoutRole()">🚪 Keluar</button>
@@ -937,6 +938,24 @@
             </table>
           </div>
         </div>
+
+        <div class="card" style="margin-top:1rem;">
+          <div class="card-header">
+            <h3>☁️ Pengaturan Sinkronisasi Cloud Real-Time (GitHub Pages &amp; Multi-Perangkat)</h3>
+            <span id="adminCloudStatusBadge" class="badge badge-info">Status Cloud</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            Agar hasil scan di HP langsung muncul otomatis di laptop/komputer lain saat dibuka dari <strong>GitHub Pages</strong>, tempelkan konfigurasi <strong>Firebase Web App (JSON)</strong> milik sekolah di bawah ini lalu klik simpan.
+          </p>
+          <div class="form-group">
+            <label for="adminFirebaseConfigInput">Konfigurasi Firebase Web App (JSON)</label>
+            <textarea id="adminFirebaseConfigInput" rows="4" class="form-control mono" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveExternalCloudConfig()">☁️ Simpan &amp; Aktifkan Sinkronisasi Real-Time</button>
+            <button type="button" class="btn btn-success btn-sm" onclick="forcePushLocalToCloud()">⬆️ Kirim Data Perangkat Ini ke Cloud</button>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -1183,100 +1202,188 @@
   <!-- TOAST CONTAINER -->
   <div id="toastContainer" class="toast-wrap"></div>
 
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    window.__cloudBridge = {
+      ready: false,
+      db: null,
+      auth: null,
+      docRef: null,
+      unsub: null,
+      lastPushedHash: '',
+
+      async connect(customConfigObj = null) {
+        try {
+          if (this.unsub) { this.unsub(); this.unsub = null; }
+          let cfg = customConfigObj;
+          if (!cfg && typeof __firebase_config !== 'undefined' && __firebase_config) {
+            cfg = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+          }
+          if (!cfg && window.__savedCloudConfig) {
+            cfg = window.__savedCloudConfig;
+          }
+          if (!cfg || !cfg.apiKey || !cfg.projectId) {
+            window.updateCloudPillUI('offline', '⚠️ Mode Lokal (Belum Terhubung Cloud)');
+            return false;
+          }
+
+          const app = initializeApp(cfg, 'smpn1tempuran_sync_' + Date.now());
+          this.auth = getAuth(app);
+          this.db = getFirestore(app);
+
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(this.auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(this.auth);
+          }
+
+          if (!this.auth.currentUser) return false;
+
+          const appId = typeof __app_id !== 'undefined' ? __app_id : 'smpn1tempuran-absensi';
+          this.docRef = doc(this.db, 'artifacts', appId, 'public', 'data', 'school_state', 'main');
+          this.ready = true;
+          window.updateCloudPillUI('online', '🟢 Cloud Real-Time Aktif');
+
+          this.unsub = onSnapshot(this.docRef, (snap) => {
+            if (snap.exists()) {
+              const incoming = snap.data();
+              if (incoming && incoming.payload) {
+                if (incoming.payload !== this.lastPushedHash) {
+                  this.lastPushedHash = incoming.payload;
+                  window.applyIncomingCloudState(incoming.payload);
+                }
+              }
+            } else {
+              window.pushStateToCloud(true);
+            }
+          }, (err) => {
+            window.updateCloudPillUI('offline', '⚠️ Gangguan Koneksi Cloud');
+          });
+
+          return true;
+        } catch (err) {
+          window.updateCloudPillUI('offline', '⚠️ Gagal Koneksi Cloud');
+          return false;
+        }
+      },
+
+      async push(jsonStr) {
+        if (!this.ready || !this.docRef || !this.auth?.currentUser) return;
+        if (jsonStr === this.lastPushedHash) return;
+        try {
+          this.lastPushedHash = jsonStr;
+          await setDoc(this.docRef, {
+            payload: jsonStr,
+            updatedAt: Date.now()
+          });
+        } catch (e) {}
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => { window.__cloudBridge.connect(); }, 200);
+    });
+  </script>
+
   <script>
     /**
      * =========================================================================
      * SISTEM ABSENSI DIGITAL TERPADU - SMP NEGERI 1 TEMPURAN
-     * Lengkap: Absen Pagi, Izin Kamera Langsung Wajah+Surat, Kartu QR Resmi,
-     * Guru Mapel/Ekskul, Guru Agama, Guru Wali, Wali Kelas, Guru BK, Admin.
      * =========================================================================
      */
 
     const STORAGE_KEY = 'smpn1tempuran_terpadu_v5';
+    const CLOUD_CFG_KEY = 'smpn1tempuran_cloud_cfg_v1';
 
     const ALL_CLASSES = [
-      'VIIA','VIIB','VIIC','VIID','VIIE','VIIF','VIIG',
-      'VIIIA','VIIIB','VIIIC','VIIID','VIIIE','VIIIF','VIIIG',
-      'IXA','IXB','IXC','IXD','IXE','IXF','IXG'
+      'VIIA', 'VIIB', 'VIIC', 'VIID', 'VIIE', 'VIIF', 'VIIG',
+      'VIIIA', 'VIIIB', 'VIIIC', 'VIIID', 'VIIIE', 'VIIIF', 'VIIIG',
+      'IXA', 'IXB', 'IXC', 'IXD', 'IXE', 'IXF', 'IXG'
     ];
 
     const CLASS_LABELS = {
-      VIIA:'7A (VIIA)', VIIB:'7B (VIIB)', VIIC:'7C (VIIC)', VIID:'7D (VIID)', VIIE:'7E (VIIE)', VIIF:'7F (VIIF)', VIIG:'7G (VIIG)',
-      VIIIA:'8A (VIIIA)', VIIIB:'8B (VIIIB)', VIIIC:'8C (VIIIC)', VIIID:'8D (VIIID)', VIIIE:'8E (VIIIE)', VIIIF:'8F (VIIIF)', VIIIG:'8G (VIIIG)',
-      IXA:'9A (IXA)', IXB:'9B (IXB)', IXC:'9C (IXC)', IXD:'9D (IXD)', IXE:'9E (IXE)', IXF:'9F (IXF)', IXG:'9G (IXG)'
+      VIIA: '7A (VIIA)', VIIB: '7B (VIIB)', VIIC: '7C (VIIC)', VIID: '7D (VIID)', VIIE: '7E (VIIE)', VIIF: '7F (VIIF)', VIIG: '7G (VIIG)',
+      VIIIA: '8A (VIIIA)', VIIIB: '8B (VIIIB)', VIIIC: '8C (VIIIC)', VIIID: '8D (VIIID)', VIIIE: '8E (VIIIE)', VIIIF: '8F (VIIIF)', VIIIG: '8G (VIIIG)',
+      IXA: '9A (IXA)', IXB: '9B (IXB)', IXC: '9C (IXC)', IXD: '9D (IXD)', IXE: '9E (IXE)', IXF: '9F (IXF)', IXG: '9G (IXG)'
     };
 
-    const DEFAULT_SCHOOL_LOGO_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-        <path d="M60 6 L108 26 L102 82 C98 100 78 112 60 116 C42 112 22 100 18 82 L12 26 Z" fill="#38bdf8" stroke="#0a1931" stroke-width="5"/>
-        <circle cx="60" cy="62" r="32" fill="#ffffff" stroke="#0a1931" stroke-width="3"/>
-        <polygon points="60,34 68,58 60,52 52,58" fill="#0a1931"/>
-        <path d="M36 86 Q60 76 84 86 L80 95 Q60 86 40 95 Z" fill="#dc2626"/>
-        <text x="60" y="23" font-family="Arial" font-size="8.5" font-weight="bold" fill="#0a1931" text-anchor="middle">SMP NEGERI 1</text>
-      </svg>`
-    );
+    const DEFAULT_SCHOOL_LOGO_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+        <path d="M60 6 L108 24 V64 C108 92 84 109 60 116 C36 109 12 92 12 64 V24 Z" fill="#0a1931" stroke="#fbbf24" stroke-width="5"/>
+        <circle cx="60" cy="54" r="24" fill="#1d4ed8" stroke="#fde047" stroke-width="3"/>
+        <polygon points="60,34 65,48 80,48 68,57 72,71 60,62 48,71 52,57 40,48 55,48" fill="#fbbf24"/>
+        <text x="60" y="96" font-family="sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">SMPN 1</text>
+      </svg>
+    `);
 
     const DEFAULT_ROOMS = [
-      { id: 'ekskul_kd', type: 'Ekstrakurikuler', name: 'Ekstrakurikuler Kreasi Digital', teacher: 'Pembina Kreasi Digital', prefix: 'KD', pin: '1234' },
+      { id: 'mapel_pai', type: 'Mata Pelajaran', name: 'Pendidikan Agama Islam (PAI)', teacher: 'Guru PAI SMPN 1 Tempuran', prefix: 'PAI', pin: '1234' },
+      { id: 'mapel_pkn', type: 'Mata Pelajaran', name: 'Pendidikan Pancasila (PKn)', teacher: 'Guru PKn SMPN 1 Tempuran', prefix: 'PKN', pin: '1234' },
+      { id: 'mapel_bin', type: 'Mata Pelajaran', name: 'Bahasa Indonesia', teacher: 'Guru Bahasa Indonesia', prefix: 'BIN', pin: '1234' },
       { id: 'mapel_mtk', type: 'Mata Pelajaran', name: 'Matematika', teacher: 'Guru Matematika', prefix: 'MTK', pin: '1234' },
-      { id: 'mapel_bindo', type: 'Mata Pelajaran', name: 'Bahasa Indonesia', teacher: 'Guru Bahasa Indonesia', prefix: 'IND', pin: '1234' },
-      { id: 'mapel_bing', type: 'Mata Pelajaran', name: 'Bahasa Inggris', teacher: 'Guru Bahasa Inggris', prefix: 'ING', pin: '1234' },
       { id: 'mapel_ipa', type: 'Mata Pelajaran', name: 'Ilmu Pengetahuan Alam (IPA)', teacher: 'Guru IPA', prefix: 'IPA', pin: '1234' },
       { id: 'mapel_ips', type: 'Mata Pelajaran', name: 'Ilmu Pengetahuan Sosial (IPS)', teacher: 'Guru IPS', prefix: 'IPS', pin: '1234' },
-      { id: 'mapel_pai', type: 'Mata Pelajaran', name: 'Pendidikan Agama Islam (PAI)', teacher: 'Guru PAI', prefix: 'PAI', pin: '1234' },
-      { id: 'mapel_ppkn', type: 'Mata Pelajaran', name: 'Pendidikan Pancasila (PPKn)', teacher: 'Guru PPKn', prefix: 'PKN', pin: '1234' },
-      { id: 'mapel_pjok', type: 'Mata Pelajaran', name: 'PJOK', teacher: 'Guru PJOK', prefix: 'PJK', pin: '1234' },
+      { id: 'mapel_big', type: 'Mata Pelajaran', name: 'Bahasa Inggris', teacher: 'Guru Bahasa Inggris', prefix: 'BIG', pin: '1234' },
+      { id: 'mapel_pjok', type: 'Mata Pelajaran', name: 'PJOK', teacher: 'Guru PJOK', prefix: 'PJOK', pin: '1234' },
       { id: 'mapel_inf', type: 'Mata Pelajaran', name: 'Informatika', teacher: 'Guru Informatika', prefix: 'INF', pin: '1234' },
-      { id: 'mapel_sbk', type: 'Mata Pelajaran', name: 'Seni Budaya & Prakarya', teacher: 'Guru Seni Budaya', prefix: 'SBK', pin: '1234' }
+      { id: 'ekskul_kd', type: 'Ekstrakurikuler', name: 'Kreasi Digital', teacher: 'Pembina Kreasi Digital', prefix: 'KD', pin: '1234' }
     ];
 
-    const SAMPLE_FIRST = ['ALIFIAN','BAGAS','CITRA','DIMAS','DEWI','FAJAR','FATIMAH','HAFIZH','HANA','KURNIAWAN','LESTARI','MUHAMMAD','NABILA','RAFAEL','SALSABILA'];
-    const SAMPLE_LAST = ['PRATAMA','RAMADHANI','SARI','HIDAYAT','WIJAYA','PUTRI','NUGROHO','AZZAHRA','SAPUTRA','PERMATASARI'];
+    const SAMPLE_FIRST_NAMES = [
+      'ABID AQILLA', 'ADEEVA AFSHEEN', 'ADHYASTHA PRASAJA', 'AFIFA NAHDA', 'AHMAD ZAKI',
+      'AISYAH AYUDIA', 'ALBY LUTHFY', 'ALIFIA ZAHRA', 'ALVARO GAVRIEL', 'ANINDITA KEISHA',
+      'ARKANA DZAKWAN', 'ATHARIZ CALIEF', 'AURELIA SYIFA', 'BAGAS ADITYA', 'BILQIS FAIHA',
+      'BUNGA ALIFIATUNISA', 'DAFFA ARYA', 'DANISH FAEYZA', 'DAVINA AZZAHRA', 'DEWI SAPUTRA',
+      'DIMAS PRAYOGA', 'DZAKIRA TALITA', 'EKA SHAFA', 'ELANG SAMUDRA', 'FADLAN HAKIM',
+      'FAHRI ZAFRAN', 'FAIRA NADA', 'FAJAR PRATAMA', 'FARHAN ABIMANYU', 'FATIMAH SARI',
+      'GALANG RAMBU', 'HAFIZH WIJAYA'
+    ];
 
     function generateDefaultMasterStudents() {
       const master = {};
       ALL_CLASSES.forEach((cls, cIdx) => {
-        master[cls] = [];
-        for (let i = 1; i <= 10; i++) {
-          const fn = SAMPLE_FIRST[(cIdx * 3 + i) % SAMPLE_FIRST.length];
-          const ln = SAMPLE_LAST[(cIdx + i * 2) % SAMPLE_LAST.length];
-          const num = String(i).padStart(2, '0');
-          master[cls].push({
-            id: `${cls}-0${num}`,
-            nisn: `01189${String(10 + cIdx).padStart(2,'0')}0${num}`,
-            name: `${fn} ${ln} (${cls})`,
-            kelas: cls,
-            sesi: i <= 5 ? 1 : 2
-          });
-        }
+        const prefixNum = cls.startsWith('IX') ? '011892' : cls.startsWith('VIII') ? '011893' : '011891';
+        master[cls] = SAMPLE_FIRST_NAMES.map((nm, sIdx) => ({
+          id: `${cls}-0${String(sIdx + 1).padStart(2, '0')}`,
+          nisn: `${prefixNum}${String(cIdx * 32 + sIdx + 1).padStart(4, '0')}`,
+          name: `${nm} (${cls})`,
+          kelas: cls,
+          sesi: sIdx < 16 ? 1 : 2
+        }));
       });
       return master;
     }
 
     function getTodayISO() {
       const now = new Date();
-      return new Date(now - now.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+      const tzOffset = now.getTimezoneOffset() * 60000;
+      return new Date(now - tzOffset).toISOString().split('T')[0];
     }
 
     function normalizeClassCode(raw) {
       if (!raw) return '';
-      let c = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
-      c = c.replace(/^9([A-G])$/, 'IX$1').replace(/^8([A-G])$/, 'VIII$1').replace(/^7([A-G])$/, 'VII$1');
-      return c;
-    }
-
-    function isAgamaRoom(room) {
-      if (!room) return false;
-      const hay = `${room.id} ${room.name}`.toLowerCase();
-      return hay.includes('pai') || hay.includes('agama');
+      let clean = String(raw).toUpperCase().replace(/[^0-9A-Z]/g, '');
+      clean = clean.replace(/^9([A-G])$/, 'IX$1');
+      clean = clean.replace(/^8([A-G])$/, 'VIII$1');
+      clean = clean.replace(/^7([A-G])$/, 'VII$1');
+      return clean;
     }
 
     function isEkskulRoom(room) {
       return room && String(room.type || '').toLowerCase().includes('ekstra');
     }
 
+    function isAgamaRoom(room) {
+      if (!room) return false;
+      const hay = `${room.id} ${room.name} ${room.prefix}`.toLowerCase();
+      return hay.includes('agama') || hay.includes('pai');
+    }
+
     let appData = null;
-    let currentSession = { role: 'public', roomId: 'mapel_mtk', waliClass: 'VIIA', bkLevel: 'VII' };
+    let currentSession = { role: 'public', roomId: 'mapel_mtk' };
     let activeCameraStream = null;
     let activeScanInterval = null;
     let izinStream = null;
@@ -1299,7 +1406,7 @@
 
         const kdStudents = [];
         ['VIIA','VIIB','VIIC','VIIIA','VIIIB'].forEach((cls, idx) => {
-          masterStudents[cls].slice(0, 9).forEach((s, i) => {
+          masterStudents[cls].slice(0, 9).forEach((s) => {
             const sesi = idx < 3 ? 1 : 2;
             kdStudents.push({
               id: `KD${sesi}-${String(kdStudents.length + 1).padStart(2, '0')}`,
@@ -1331,12 +1438,102 @@
       if (!appData.schoolLogo) appData.schoolLogo = DEFAULT_SCHOOL_LOGO_SVG;
       if (!appData.guruWaliPin) appData.guruWaliPin = '4040';
       if (!appData.bkPins) appData.bkPins = { VII: '3030', VIII: '3030', IX: '3030' };
+      try {
+        const savedCfg = localStorage.getItem(CLOUD_CFG_KEY);
+        if (savedCfg) window.__savedCloudConfig = JSON.parse(savedCfg);
+      } catch (e) {}
     }
 
-    function saveAppData() {
+    let cloudPushTimer = null;
+
+    function saveAppData(skipCloud = false) {
+      const serialized = JSON.stringify(appData);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        localStorage.setItem(STORAGE_KEY, serialized);
       } catch (e) {}
+      if (!skipCloud) {
+        clearTimeout(cloudPushTimer);
+        cloudPushTimer = setTimeout(() => {
+          if (window.__cloudBridge && window.__cloudBridge.ready) {
+            window.__cloudBridge.push(serialized);
+          }
+        }, 250);
+      }
+    }
+
+    window.updateCloudPillUI = function(status, text) {
+      const pill = document.getElementById('cloudSyncPill');
+      const adminBadge = document.getElementById('adminCloudStatusBadge');
+      if (pill) {
+        pill.textContent = text;
+        pill.className = status === 'online' ? 'role-pill pill-teacher' : 'role-pill pill-guest';
+      }
+      if (adminBadge) {
+        adminBadge.textContent = text;
+        adminBadge.className = status === 'online' ? 'badge badge-success' : 'badge badge-warning';
+      }
+    };
+
+    window.pushStateToCloud = function(force = false) {
+      if (!appData) return;
+      const serialized = JSON.stringify(appData);
+      if (force && window.__cloudBridge) window.__cloudBridge.lastPushedHash = '';
+      if (window.__cloudBridge && window.__cloudBridge.ready) {
+        window.__cloudBridge.push(serialized);
+      }
+    };
+
+    window.applyIncomingCloudState = function(serializedPayload) {
+      try {
+        const incoming = JSON.parse(serializedPayload);
+        if (!incoming || !incoming.rooms || !incoming.masterStudents) return;
+        appData = incoming;
+        localStorage.setItem(STORAGE_KEY, serializedPayload);
+
+        const role = currentSession.role;
+        if (role === 'public') {
+          refreshPagiUI();
+        } else if (role === 'guru' || role === 'admin') {
+          refreshWorkspaceUI();
+          if (!document.getElementById('wsTabAgamaRekap').classList.contains('hidden')) renderAgamaSholatRekap();
+          if (!document.getElementById('wsTabAdmin').classList.contains('hidden')) renderAdminPanel();
+        } else if (role === 'guru_wali') {
+          refreshGuruWaliUI();
+        } else if (role === 'wali_kelas' || role === 'guru_bk') {
+          refreshHomeroomDashboard();
+        }
+      } catch (e) {}
+    };
+
+    async function saveExternalCloudConfig() {
+      const raw = document.getElementById('adminFirebaseConfigInput').value.trim();
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed.apiKey || !parsed.projectId) {
+          showToast('error', 'Format JSON Kurang Lengkap', 'Pastikan berisi apiKey dan projectId.');
+          return;
+        }
+        window.__savedCloudConfig = parsed;
+        localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify(parsed));
+        const ok = await window.__cloudBridge.connect(parsed);
+        if (ok) {
+          window.pushStateToCloud(true);
+          showToast('success', 'Cloud Real-Time Aktif!', 'Semua perangkat kini tersinkronisasi otomatis.');
+        } else {
+          showToast('error', 'Gagal Menghubungkan Cloud', 'Periksa kembali konfigurasi Firebase Anda.');
+        }
+      } catch (e) {
+        showToast('error', 'JSON Tidak Valid', 'Pastikan tanda kutip dan kurung kurawal sesuai format JSON.');
+      }
+    }
+
+    function forcePushLocalToCloud() {
+      if (!window.__cloudBridge || !window.__cloudBridge.ready) {
+        showToast('error', 'Cloud Belum Aktif', 'Simpan konfigurasi Cloud terlebih dahulu.');
+        return;
+      }
+      window.pushStateToCloud(true);
+      showToast('success', 'Data Terkirim ke Cloud', 'Perangkat lain akan otomatis memperbarui tampilan.');
     }
 
     function showToast(type, title, desc = '') {
@@ -1357,7 +1554,6 @@
     function closeModal(id) {
       const el = document.getElementById(id);
       if (el) el.classList.add('hidden');
-      if (id === 'photoPreviewModal') return;
     }
 
     /* =====================================================================
@@ -1464,7 +1660,6 @@
         activeScanInterval = setInterval(async () => {
           if (!activeCameraStream || v.readyState < 2 || !v.videoWidth) return;
           try {
-            // 1. Prioritas jsQR (bekerja cepat di semua browser Android/iOS/Desktop)
             if (typeof jsQR === 'function') {
               const targetW = Math.min(480, v.videoWidth);
               const scale = targetW / v.videoWidth;
@@ -1478,7 +1673,6 @@
                 return;
               }
             }
-            // 2. Fallback BarcodeDetector bawaan Chrome
             if (nativeDetector) {
               const codes = await nativeDetector.detect(v);
               if (codes && codes.length && codes[0].rawValue) {
@@ -1649,7 +1843,6 @@
       ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
       if (izinFacingMode === 'user') ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-      // Cek kecerahan foto
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
       let lum = 0;
       for (let i = 0; i < data.length; i += 16) lum += 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
@@ -1658,7 +1851,6 @@
         return;
       }
 
-      // Stempel waktu & nama siswa
       const cls = document.getElementById('izinClassSelect').value;
       const stId = document.getElementById('izinStudentSelect').value;
       const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
@@ -1850,7 +2042,6 @@
           switcher.innerHTML = appData.rooms.map(r => `<option value="${r.id}" ${r.id === room.id ? 'selected' : ''}>${r.name}</option>`).join('');
         }
 
-        // Aturan visibilitas Absen Sholat: hanya Guru Agama & Admin
         document.getElementById('wsTabBtnSholat').classList.toggle('hidden', !(role === 'admin' || agama));
         document.getElementById('wsTabBtnAgamaRekap').classList.toggle('hidden', !(role === 'admin' || agama));
         document.getElementById('wsTabBtnAdmin').classList.toggle('hidden', role !== 'admin');
@@ -1871,7 +2062,7 @@
         const bkSel = document.getElementById('bkClassSelector');
         bkSel.classList.toggle('hidden', role !== 'guru_bk');
         if (role === 'guru_bk') {
-          const lvlClasses = ALL_CLASSES.filter(c => c.startsWith(currentSession.bkLevel + 'A'.slice(0,0)) && (
+          const lvlClasses = ALL_CLASSES.filter(c => (
             currentSession.bkLevel === 'VII' ? c.startsWith('VII') && !c.startsWith('VIII') :
             currentSession.bkLevel === 'VIII' ? c.startsWith('VIII') : c.startsWith('IX')
           ));
@@ -2225,7 +2416,6 @@
         <div class="stat-card"><div class="stat-label" style="color:var(--danger);">Alpa</div><div class="stat-value" style="color:var(--danger);">${a}</div></div>
       `;
 
-      // Tabel Verifikasi Izin
       const activeCls = isEkskulRoom(room) ? null : document.getElementById('wsClassFilter').value;
       const izins = appData.izinRequests.filter(item => !activeCls || item.cls === activeCls);
       const pendingCnt = izins.filter(x => x.status === 'Menunggu Verifikasi').length;
@@ -2248,7 +2438,6 @@
         </tr>
       `).join('') : `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Belum ada pengajuan izin/sakit.</td></tr>`;
 
-      // Tabel Siswa Ruang
       document.getElementById('rekapStudentTableBody').innerHTML = students.map((st, idx) => {
         const r = att[st.id];
         return `
@@ -2489,6 +2678,10 @@
       const mSel = document.getElementById('adminMasterClassSelect');
       if (!mSel.options.length) {
         mSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+      }
+      const cfgBox = document.getElementById('adminFirebaseConfigInput');
+      if (cfgBox && !cfgBox.value && window.__savedCloudConfig) {
+        cfgBox.value = JSON.stringify(window.__savedCloudConfig, null, 2);
       }
       renderAdminMasterClassTable();
 
@@ -2821,7 +3014,6 @@
         <div class="stat-card"><div class="stat-label" style="color:var(--danger);">Total S / I / A Mapel</div><div class="stat-value" style="color:var(--danger);">${totalMapelSia}</div></div>
       `;
 
-      // Daftar Izin (Hanya baca bagi Wali Kelas & Guru BK)
       const izins = appData.izinRequests.filter(x => x.cls === cls);
       document.getElementById('hrIzinTableBody').innerHTML = izins.length ? izins.map(item => `
         <tr>
