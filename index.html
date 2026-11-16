@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sistem Absensi Digital Terpadu - SMP Negeri 1 Tempuran</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <style>
     :root {
       --primary: #0f2557;
@@ -1359,46 +1361,46 @@
     }
 
     /* =====================================================================
-       QR CODE GENERATOR SVG (NAVY #0a1931)
+       QR CODE GENERATOR SVG STANDAR ISO (NAVY #0a1931)
        ===================================================================== */
     function createQrSvg(text) {
-      const size = 21;
-      const m = Array.from({ length: size }, () => Array(size).fill(0));
-      function finder(r0, c0) {
-        for (let r = -1; r <= 7; r++) {
-          for (let c = -1; c <= 7; c++) {
-            const rr = r0 + r, cc = c0 + c;
-            if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
-            if (r === -1 || r === 7 || c === -1 || c === 7) m[rr][cc] = 2;
-            else if (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) m[rr][cc] = 1;
-            else m[rr][cc] = 2;
+      const payload = String(text || 'SMPN1').trim();
+      if (typeof qrcode === 'function') {
+        try {
+          const qr = qrcode(0, 'M');
+          qr.addData(payload);
+          qr.make();
+          const count = qr.getModuleCount();
+          const pad = 2;
+          const total = count + pad * 2;
+          let rects = '';
+          for (let r = 0; r < count; r++) {
+            for (let c = 0; c < count; c++) {
+              if (qr.isDark(r, c)) {
+                rects += `<rect x="${c + pad}" y="${r + pad}" width="1" height="1" fill="#0a1931"/>`;
+              }
+            }
           }
-        }
+          return `<svg viewBox="0 0 ${total} ${total}" width="100%" height="100%" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${total}" height="${total}" fill="#ffffff"/>${rects}</svg>`;
+        } catch (err) {}
       }
-      finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
-      for (let i = 8; i < size - 8; i++) {
-        m[6][i] = i % 2 === 0 ? 1 : 2;
-        m[i][6] = i % 2 === 0 ? 1 : 2;
-      }
-      let h = 2166136261;
-      const s = String(text || 'SMPN1');
-      for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-      let seed = h >>> 0;
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          if (m[r][c] === 0) {
-            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-            m[r][c] = (((seed >>> 24) ^ s.charCodeAt((r * size + c) % s.length)) & 1) ? 1 : 2;
-          }
-        }
-      }
-      let rects = '';
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          if (m[r][c] === 1) rects += `<rect x="${c}" y="${r}" width="1" height="1" fill="#0a1931"/>`;
-        }
-      }
-      return `<svg viewBox="0 0 ${size} ${size}" width="100%" height="100%" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${size}" height="${size}" fill="#ffffff"/>${rects}</svg>`;
+      return `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-weight:900;font-size:0.8rem;color:#0a1931;">${payload}</div>`;
+    }
+
+    function playScanBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.16);
+      } catch (e) {}
     }
 
     /* =====================================================================
@@ -1442,28 +1444,49 @@
         if (bStart) bStart.classList.add('hidden');
         if (bStop) bStop.classList.remove('hidden');
 
-        if ('BarcodeDetector' in window) {
-          const detector = new BarcodeDetector({ formats: ['qr_code'] });
-          activeScanInterval = setInterval(async () => {
-            if (!activeCameraStream || v.readyState < 2) return;
-            try {
-              const codes = await detector.detect(v);
-              if (codes && codes.length) {
-                const raw = (codes[0].rawValue || '').trim().toUpperCase();
-                const now = Date.now();
-                if (raw && (raw !== lastQrHit.code || now - lastQrHit.time > 2800)) {
-                  lastQrHit = { code: raw, time: now };
-                  if (mode === 'pagi') processPagiScan(raw);
-                  else if (mode === 'ws') processWsScan(raw);
-                  else if (mode === 'sholat') processWsSholatScan(raw);
-                  else if (mode === 'gw') processGuruWaliScan(raw);
-                }
+        const scanCanvas = document.createElement('canvas');
+        const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+        const nativeDetector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
+
+        const handleDecodedValue = (rawText) => {
+          const raw = String(rawText || '').trim().toUpperCase();
+          const now = Date.now();
+          if (raw && (raw !== lastQrHit.code || now - lastQrHit.time > 2500)) {
+            lastQrHit = { code: raw, time: now };
+            playScanBeep();
+            if (mode === 'pagi') processPagiScan(raw);
+            else if (mode === 'ws') processWsScan(raw);
+            else if (mode === 'sholat') processWsSholatScan(raw);
+            else if (mode === 'gw') processGuruWaliScan(raw);
+          }
+        };
+
+        activeScanInterval = setInterval(async () => {
+          if (!activeCameraStream || v.readyState < 2 || !v.videoWidth) return;
+          try {
+            // 1. Prioritas jsQR (bekerja cepat di semua browser Android/iOS/Desktop)
+            if (typeof jsQR === 'function') {
+              const targetW = Math.min(480, v.videoWidth);
+              const scale = targetW / v.videoWidth;
+              scanCanvas.width = targetW;
+              scanCanvas.height = Math.round(v.videoHeight * scale);
+              scanCtx.drawImage(v, 0, 0, scanCanvas.width, scanCanvas.height);
+              const imgData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+              const decoded = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+              if (decoded && decoded.data) {
+                handleDecodedValue(decoded.data);
+                return;
               }
-            } catch (e) {}
-          }, 420);
-        } else {
-          showToast('error', 'Browser Tidak Mendukung Auto-Scan QR', 'Gunakan Google Chrome Android terbaru atau ketik kode di kolom bawah.');
-        }
+            }
+            // 2. Fallback BarcodeDetector bawaan Chrome
+            if (nativeDetector) {
+              const codes = await nativeDetector.detect(v);
+              if (codes && codes.length && codes[0].rawValue) {
+                handleDecodedValue(codes[0].rawValue);
+              }
+            }
+          } catch (e) {}
+        }, 280);
       } catch (err) {
         showToast('error', 'Kamera Tidak Dapat Dibuka', 'Pastikan izin kamera diaktifkan atau ketik kode siswa secara manual.');
       }
