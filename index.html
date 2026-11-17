@@ -1311,6 +1311,7 @@
     let hasUnsyncedLocalChanges = false;
     let lastLocalMutationAt = 0;
     let isSyncingFromCloud = false;
+    let isPushingToCloud = false;
 
     function getAppsScriptUrl() {
       return localStorage.getItem(APPS_SCRIPT_URL_KEY) || DEFAULT_APPS_SCRIPT_URL;
@@ -1451,6 +1452,7 @@
   if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
     url = url.replace(/\/$/, '') + '/absensi.json';
   }
+  isPushingToCloud = true;
   try {
     const payloadObj = { ...appData };
     delete payloadObj._isFreshDefault;
@@ -1475,13 +1477,15 @@
     if (notifyUser) {
       showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
     }
+  } finally {
+    isPushingToCloud = false;
   }
 }
 
 async function pullStateFromAppsScript(notifyUser = false) {
   let url = getAppsScriptUrl();
-  if (!url || isSyncingFromCloud) return;
-  if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 12000)) {
+  if (!url || isSyncingFromCloud || isPushingToCloud) return;
+  if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 15000)) {
     return;
   }
   if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
@@ -1532,61 +1536,56 @@ async function pullStateFromAppsScript(notifyUser = false) {
     isSyncingFromCloud = false;
   }
 }
-    /* =========================================================================
-       PENCARIAN SISWA LINTAS FORMAT QR / NISN / NAMA
-       ========================================================================= */
-    function findStudentAcrossSystem(rawCode, preferredClass = null) {
-      const q = String(rawCode || '').trim().toUpperCase();
-      if (!q) return null;
 
-      // 1. Cek di kelas prioritas pada masterStudents
-      if (preferredClass && appData.masterStudents[preferredClass]) {
-        const list = appData.masterStudents[preferredClass];
-        const exact = list.find(s =>
-          s.id.toUpperCase() === q ||
-          (s.nisn && s.nisn.toUpperCase() === q) ||
-          q.endsWith('-' + s.id.toUpperCase())
-        );
-        if (exact) return { ...exact, kelas: preferredClass };
-      }
+/* =========================================================================
+   PENCARIAN SISWA LINTAS FORMAT QR / NISN / NAMA
+   ========================================================================= */
+function cleanKey(val) {
+  return String(val || '').replace(/[\u200B-\u200D\uFEFF\r\n\t]/g, '').trim().toUpperCase();
+}
 
-      // 2. Cek di seluruh Bank Data Kelas Induk (termasuk kartu ber-prefix mapel seperti PAI-VIIA-01 / MTK-VIIA-01)
-      for (const cls of ALL_CLASSES) {
-        const list = appData.masterStudents[cls] || [];
-        for (const s of list) {
-          const sId = s.id.toUpperCase();
-          if (
-            sId === q ||
-            (s.nisn && s.nisn.toUpperCase() === q) ||
-            q.endsWith('-' + sId)
-          ) {
-            return { ...s, kelas: cls };
-          }
-        }
-      }
+function findStudentAcrossSystem(rawCode, preferredClass = null) {
+  const q = cleanKey(rawCode);
+  if (!q) return null;
 
-      // 3. Cek di seluruh ruang Mapel / Ekskul
-      for (const rId of Object.keys(appData.roomStudents || {})) {
-        const rList = appData.roomStudents[rId] || [];
-        const found = rList.find(s =>
-          s.id.toUpperCase() === q ||
-          (s.nisn && s.nisn.toUpperCase() === q)
-        );
-        if (found) return found;
-      }
+  const matchStudent = (s, qStr) => {
+    const sId = cleanKey(s.id);
+    const sNisn = cleanKey(s.nisn);
+    const sName = cleanKey(s.name);
+    return (
+      sId === qStr ||
+      (sNisn && sNisn === qStr) ||
+      qStr.endsWith('-' + sId) ||
+      (sNisn && qStr.endsWith('-' + sNisn)) ||
+      (qStr.length >= 4 && sName.includes(qStr))
+    );
+  };
 
-      // 4. Pencarian sebagian nama (minimal 4 huruf)
-      if (q.length >= 4) {
-        const searchPool = preferredClass && appData.masterStudents[preferredClass]
-          ? appData.masterStudents[preferredClass]
-          : ALL_CLASSES.flatMap(c => appData.masterStudents[c] || []);
-        const byName = searchPool.find(s => s.name.toUpperCase().includes(q));
-        if (byName) return byName;
-      }
+  if (preferredClass && appData.masterStudents[preferredClass]) {
+    const exact = appData.masterStudents[preferredClass].find(s => matchStudent(s, q));
+    if (exact) return { ...exact, kelas: preferredClass };
+  }
 
-      return null;
+  for (const cls of ALL_CLASSES) {
+    const list = appData.masterStudents[cls] || [];
+    const found = list.find(s => matchStudent(s, q));
+    if (found) return { ...found, kelas: cls };
+  }
+
+  for (const rId of Object.keys(appData.roomStudents || {})) {
+    const rList = appData.roomStudents[rId] || [];
+    const found = rList.find(s => matchStudent(s, q));
+    if (found) {
+      const cls = normalizeClassCode(found.kelas);
+      const masterMatch = (appData.masterStudents[cls] || []).find(
+        m => cleanKey(m.name) === cleanKey(found.name) || (found.nisn && cleanKey(m.nisn) === cleanKey(found.nisn))
+      );
+      return masterMatch ? { ...masterMatch, kelas: cls } : found;
     }
+  }
 
+  return null;
+}
     /* =========================================================================
        PEMINDAI KAMERA QR UNIVERSAL (jsQR + BarcodeDetector + Beep)
        ========================================================================= */
