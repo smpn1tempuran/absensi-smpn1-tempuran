@@ -2349,18 +2349,25 @@ async function pullStateFromAppsScript(notifyUser = false) {
     /* =========================================================================
        ABSEN SHOLAT (GURU AGAMA & GURU WALI)
        ========================================================================= */
-    function recordSholatForStudent(masterStudent, sholatType, dateStr, status = 'Jamaah') {
-      const cls = normalizeClassCode(masterStudent.kelas);
-      if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
-      if (!appData.sholatAttendance[dateStr][sholatType]) appData.sholatAttendance[dateStr][sholatType] = {};
-      if (!appData.sholatAttendance[dateStr][sholatType][cls]) appData.sholatAttendance[dateStr][sholatType][cls] = {};
+   function recordSholatForStudent(masterStudent, sholatType, dateStr, status = 'Jamaah') {
+  const cls = normalizeClassCode(masterStudent.kelas);
+  const masterList = (appData.masterStudents && appData.masterStudents[cls]) || [];
+  const canonical = masterList.find(s =>
+    s.id === masterStudent.id ||
+    (masterStudent.nisn && s.nisn === masterStudent.nisn) ||
+    s.name.toUpperCase() === String(masterStudent.name || '').toUpperCase()
+  ) || masterStudent;
 
-      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      appData.sholatAttendance[dateStr][sholatType][cls][masterStudent.id] = { status, time: timeStr };
-      saveAppData();
-      showToast('success', `Sholat ${sholatType}: ${status}`, `${masterStudent.name} (${cls}) • ${timeStr}`);
-    }
+  if (!appData.sholatAttendance) appData.sholatAttendance = {};
+  if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
+  if (!appData.sholatAttendance[dateStr][sholatType]) appData.sholatAttendance[dateStr][sholatType] = {};
+  if (!appData.sholatAttendance[dateStr][sholatType][cls]) appData.sholatAttendance[dateStr][sholatType][cls] = {};
 
+  const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  appData.sholatAttendance[dateStr][sholatType][cls][canonical.id] = { status, time: timeStr };
+  saveAppData();
+  showToast('success', `Sholat ${sholatType}: ${status}`, `${canonical.name} (${cls}) • ${timeStr}`);
+}
     function handleWsSholatManualScan(e) {
       e.preventDefault();
       const inp = document.getElementById('wsSholatCodeInput');
