@@ -1369,6 +1369,7 @@
     let isSyncingFromCloud = false;
     let hasUnsyncedLocalChanges = false;
     let lastLocalMutationAt = 0;
+    let localRevision = 0;
 
     function updateCloudPillUI(status, text) {
       const pill = document.getElementById('cloudSyncPill');
@@ -1384,6 +1385,9 @@
     }
 
     function saveAppData(skipCloud = false) {
+      localRevision++;
+      appData._rev = localRevision;
+      appData._updatedAt = Date.now();
       const serialized = JSON.stringify(appData);
       try {
         localStorage.setItem(STORAGE_KEY, serialized);
@@ -1394,7 +1398,7 @@
         clearTimeout(cloudPushTimer);
         cloudPushTimer = setTimeout(() => {
           pushStateToAppsScript(false);
-        }, 200);
+        }, 250);
       }
     }
 
@@ -1429,7 +1433,7 @@
     async function pullStateFromAppsScript(notifyUser = false) {
       const url = getAppsScriptUrl();
       if (!url || isSyncingFromCloud) return;
-      if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 6500)) {
+      if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 25000)) {
         return;
       }
       isSyncingFromCloud = true;
@@ -1448,6 +1452,14 @@
         const incoming = JSON.parse(trimmed);
         if (incoming && Array.isArray(incoming.rooms) && incoming.masterStudents) {
           updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
+          const localTime = Number(appData?._updatedAt || 0);
+          const remoteTime = Number(incoming._updatedAt || 0);
+
+          if (!notifyUser && localTime > 0 && remoteTime < localTime) {
+            await pushStateToAppsScript(false);
+            return;
+          }
+
           if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser)) {
             lastCloudSnapshotHash = trimmed;
             hasUnsyncedLocalChanges = false;
@@ -2579,9 +2591,26 @@
     }
 
     function renderQrCards() {
-      const students = getFilteredWsStudents();
+      const room = getActiveWsRoom();
+      const filterVal = document.getElementById('wsClassFilter')?.value || 'VIIA';
+      let students = getFilteredWsStudents();
+
+      if (!students.length && !isEkskulRoom(room)) {
+        const norm = normalizeClassCode(filterVal);
+        if (ALL_CLASSES.includes(norm)) {
+          syncClassFromMasterSilently(room.id, norm);
+          students = getFilteredWsStudents();
+        }
+      }
+
       const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
-      document.getElementById('qrCardsGrid').innerHTML = students.map(s => `
+      const grid = document.getElementById('qrCardsGrid');
+      if (!students.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:1.5rem; color:var(--text-muted);">Belum ada siswa pada kelas/sesi ini. Silakan pilih kelas yang sudah memiliki data siswa.</div>`;
+        return;
+      }
+
+      grid.innerHTML = students.map(s => `
         <div class="id-card">
           <div class="id-card-header">
             <img src="${logo}" class="id-card-logo" alt="Logo SMPN 1 Tempuran" />
@@ -2702,29 +2731,46 @@
 
     function deleteMasterStudent(cls, stId) {
       appData.masterStudents[cls] = (appData.masterStudents[cls] || []).filter(s => s.id !== stId);
+      syncAllClassesToAllMapelRooms();
       saveAppData();
       renderAdminMasterClassTable();
+      refreshWorkspaceUI();
     }
 
     function downloadMasterTemplateCSV() {
       const cls = document.getElementById('adminMasterClassSelect')?.value || 'ALL';
       if (cls === 'ALL') {
-        const rows = [
+        downloadCsvFile([
           ['Nama Lengkap', 'Kelas', 'NISN'],
           ['BUDI SANTOSO', 'VIIA', '0118910099'],
           ['SITI AMINAH', 'VIIB', '0118910100'],
-          ['AHMAD FAUZI', 'VIIIA', '0118930101'],
-          ['DEWI LESTARI', 'IXA', '0118920102']
-        ];
-        downloadCsvFile(rows, 'Template_Import_Semua_Kelas_VIIA_IXG.csv');
-        return;
+          ['AHMAD FAUZI', 'VIIIA', '0118910101']
+        ], 'Template_Semua_Siswa_Induk_VIIA_IXG.csv');
+      } else {
+        downloadCsvFile([
+          ['Nama Lengkap', 'Kelas', 'NISN'],
+          ['BUDI SANTOSO', cls, '0118910099']
+        ], `Template_Siswa_Induk_${cls}.csv`);
       }
-      const rows = [
-        ['Nama Lengkap', 'Kelas', 'NISN'],
-        ['BUDI SANTOSO', cls, '0118910099'],
-        ['SITI AMINAH', cls, '0118910100']
-      ];
-      downloadCsvFile(rows, `Template_Siswa_Induk_${cls}.csv`);
+    }
+
+    function syncAllClassesToAllMapelRooms() {
+      appData.rooms.forEach(room => {
+        if (isEkskulRoom(room)) return;
+        const rebuilt = [];
+        ALL_CLASSES.forEach(cls => {
+          (appData.masterStudents[cls] || []).forEach((m, idx) => {
+            rebuilt.push({
+              id: `${room.prefix}-${cls}-${String(idx + 1).padStart(2, '0')}`,
+              nisn: m.nisn || '',
+              name: m.name,
+              kelas: cls,
+              sesi: 1
+            });
+          });
+        });
+        appData.roomStudents[room.id] = rebuilt;
+      });
     }
 
     function importMasterStudentsCSV(e) {
@@ -2737,6 +2783,8 @@
         const lines = (ev.target.result || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         let added = 0;
         let updated = 0;
+        let firstImportedCls = '';
+
         lines.forEach((line, idx) => {
           const p = line.split(/[,;\t]+/).map(x => x.replace(/^["']|["']$/g, '').trim());
           if (idx === 0 && (p[0].toLowerCase().includes('nama') || p[0].toLowerCase() === 'no')) return;
@@ -2758,6 +2806,7 @@
           if (!name) return;
           const normCls = normalizeClassCode(rawKelas);
           const targetCls = ALL_CLASSES.includes(normCls) ? normCls : defaultCls;
+          if (!firstImportedCls) firstImportedCls = targetCls;
           const finalNisn = nisn || `01189${String(10000 + Math.floor(Math.random() * 89999))}`;
 
           if (!appData.masterStudents[targetCls]) appData.masterStudents[targetCls] = [];
@@ -2777,10 +2826,22 @@
             updated++;
           }
         });
+
+        syncAllClassesToAllMapelRooms();
         saveAppData();
-        pushStateToAppsScript(false);
+        pushStateToAppsScript(true);
+
+        if (firstImportedCls) {
+          const wsFilter = document.getElementById('wsClassFilter');
+          if (wsFilter && [...wsFilter.options].some(o => o.value === firstImportedCls)) {
+            wsFilter.value = firstImportedCls;
+          }
+        }
+
         renderAdminMasterClassTable();
-        showToast('success', 'Import Siswa Induk Berhasil', `${added} siswa ditambahkan${updated ? `, ${updated} NISN diperbarui` : ''} & tersimpan ke Cloud.`);
+        refreshWorkspaceUI();
+        renderQrCards();
+        showToast('success', 'Import & Kartu QR Siap', `${added} siswa masuk ke semua Mapel & Kartu QR otomatis dibuat.`);
       };
       reader.readAsText(file);
       e.target.value = '';
