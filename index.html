@@ -1647,16 +1647,18 @@
           if (!activeCameraStream || v.readyState < 2 || !v.videoWidth) return;
           try {
             if (typeof jsQR === 'function') {
-              const targetW = Math.min(480, v.videoWidth);
-              const scale = targetW / v.videoWidth;
-              scanCanvas.width = targetW;
-              scanCanvas.height = Math.round(v.videoHeight * scale);
-              scanCtx.drawImage(v, 0, 0, scanCanvas.width, scanCanvas.height);
-              const imgData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-              const decoded = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
-              if (decoded && decoded.data) {
-                handleDecodedValue(decoded.data);
-                return;
+              const scales = [Math.min(720, v.videoWidth), Math.min(420, v.videoWidth)];
+              for (const targetW of scales) {
+                const scale = targetW / v.videoWidth;
+                scanCanvas.width = targetW;
+                scanCanvas.height = Math.round(v.videoHeight * scale);
+                scanCtx.drawImage(v, 0, 0, scanCanvas.width, scanCanvas.height);
+                const imgData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
+                const decoded = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+                if (decoded && decoded.data) {
+                  handleDecodedValue(decoded.data);
+                  return;
+                }
               }
             }
             if (nativeDetector) {
@@ -1666,7 +1668,7 @@
               }
             }
           } catch (e) {}
-        }, 280);
+        }, 220);
       } catch (err) {
         stopAllCameras();
         const reason = (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'))
@@ -1704,8 +1706,16 @@
         const exact = list.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q));
         if (exact) {
           const mappedCls = normalizeClassCode(exact.kelas) || 'VIIA';
-          const masterMatch = (appData.masterStudents[mappedCls] || []).find(m => m.name === exact.name) || exact;
+          const masterMatch = (appData.masterStudents[mappedCls] || []).find(m => m.nisn === exact.nisn || m.name === exact.name) || exact;
           return { student: masterMatch, cls: mappedCls };
+        }
+      }
+      const prefixStripped = q.replace(/^[A-Z0-9]+-(?=(VII|VIII|IX)[A-G]-\d+)/, '');
+      if (prefixStripped !== q) {
+        for (const cls of ALL_CLASSES) {
+          const list = appData.masterStudents[cls] || [];
+          const byStripped = list.find(s => s.id.toUpperCase() === prefixStripped);
+          if (byStripped) return { student: byStripped, cls };
         }
       }
       for (const cls of ALL_CLASSES) {
@@ -2177,14 +2187,46 @@
 
     function processWsScan(query) {
       const q = String(query || '').trim().toUpperCase();
+      if (!q) return;
+
+      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      if (!room) return;
+
       const students = getFilteredWsStudents();
-      const found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
+      let found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
+
+      // Jika kartu menggunakan prefix mapel lain / kode induk (mis. PAI-VIIA-01, VIIA-01, atau NISN)
+      if (!found) {
+        const cross = findStudentAcrossAllClasses(q);
+        if (cross) {
+          if (!isEkskulRoom(room)) {
+            const filterEl = document.getElementById('wsClassFilter');
+            if (filterEl && filterEl.value !== cross.cls) {
+              filterEl.value = cross.cls;
+            }
+            ensureRoomClassPopulated(room.id, cross.cls);
+            const updatedList = getFilteredWsStudents();
+            found = updatedList.find(s =>
+              (s.nisn && cross.student.nisn && s.nisn === cross.student.nisn) ||
+              s.name.toUpperCase() === cross.student.name.toUpperCase()
+            );
+          } else {
+            const roomList = appData.roomStudents[room.id] || [];
+            found = roomList.find(s =>
+              (s.nisn && cross.student.nisn && s.nisn === cross.student.nisn) ||
+              s.name.toUpperCase() === cross.student.name.toUpperCase()
+            );
+          }
+        }
+      }
+
       if (!found) {
         showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak ada di kelas/sesi aktif.`);
         return;
       }
+
       recordWsAttendance(found.id, 'Hadir', 'Scan QR');
-      showToast('success', `Hadir: ${found.name}`, `${found.id}`);
+      showToast('success', `Hadir: ${found.name}`, `${found.kelas} • ${found.id}`);
     }
 
     function handleWsManualScan(e) {
@@ -2262,9 +2304,23 @@
     function processWsSholatScan(query) {
       const q = String(query || '').trim().toUpperCase();
       const students = getFilteredWsStudents();
-      const found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
+      let found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
       if (!found) {
-        showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak ada di kelas/sesi aktif.`);
+        const cross = findStudentAcrossAllClasses(q);
+        if (cross) {
+          const room = appData.rooms.find(r => r.id === currentSession.roomId);
+          if (room && !isEkskulRoom(room)) {
+            document.getElementById('wsClassFilter').value = cross.cls;
+            ensureRoomClassPopulated(room.id, cross.cls);
+            refreshWorkspaceUI();
+          }
+          const sholatType = document.getElementById('wsSholatType').value;
+          recordSholatForMasterStudent(cross.cls, cross.student.id, sholatType, 'Jamaah', 'Guru Agama');
+          renderWsSholatTable();
+          showToast('success', `Sholat ${sholatType}: ${cross.student.name}`, `Kelas ${CLASS_LABELS[cross.cls]} • Status: Jamaah`);
+          return;
+        }
+        showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak terdaftar.`);
         return;
       }
       const sholatType = document.getElementById('wsSholatType').value;
