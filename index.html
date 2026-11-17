@@ -1211,7 +1211,7 @@
      * =========================================================================
      */
 
-    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyUCgJFUi2BMh_GUufqiYjlOxBVumjuXUvZDww87dsaoiWtlxAyaV18rBq1PxkgBrzW4g/exec';
+    const DEFAULT_APPS_SCRIPT_URL = 'https://absensi-smpn1-tempuran-default-rtdb.asia-southeast1.firebasedatabase.app/absensi.json';
     const STORAGE_KEY = 'smpn1tempuran_terpadu_v5';
     const APPS_SCRIPT_URL_KEY = 'smpn1tempuran_apps_script_url_v1';
 
@@ -1446,123 +1446,92 @@
     }
 
     async function pushStateToAppsScript(notifyUser = false) {
-      const url = getAppsScriptUrl();
-      if (!url || !appData) return;
-      try {
-        const payloadObj = { ...appData };
-        delete payloadObj._isFreshDefault;
-        payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
-        const serialized = JSON.stringify(payloadObj);
+  let url = getAppsScriptUrl();
+  if (!url || !appData) return;
+  if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
+    url = url.replace(/\/$/, '') + '/absensi.json';
+  }
+  try {
+    const payloadObj = { ...appData };
+    delete payloadObj._isFreshDefault;
+    payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
+    const serialized = JSON.stringify(payloadObj);
 
-        await fetch(url, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: serialized
-        });
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: serialized
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
 
-        lastCloudSnapshotHash = serialized;
-        hasUnsyncedLocalChanges = false;
-        updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
-        if (notifyUser) {
-          showToast('success', 'Terkirim ke Google Sheets', 'Seluruh data berhasil disimpan ke Cloud.');
-        }
-      } catch (err) {
-        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
-        if (notifyUser) {
-          showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
-        }
+    lastCloudSnapshotHash = serialized;
+    hasUnsyncedLocalChanges = false;
+    updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+    if (notifyUser) {
+      showToast('success', 'Terkirim ke Cloud', 'Seluruh data absensi berhasil disimpan ke Firebase.');
+    }
+  } catch (err) {
+    updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
+    if (notifyUser) {
+      showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
+    }
+  }
+}
+
+async function pullStateFromAppsScript(notifyUser = false) {
+  let url = getAppsScriptUrl();
+  if (!url || isSyncingFromCloud) return;
+  if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 12000)) {
+    return;
+  }
+  if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
+    url = url.replace(/\/$/, '') + '/absensi.json';
+  }
+  isSyncingFromCloud = true;
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const incoming = await res.json();
+
+    const trimmed = JSON.stringify(incoming || {});
+    if (!incoming || !Array.isArray(incoming.rooms) || !incoming.masterStudents) {
+      updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+      if (!appData._isFreshDefault) {
+        await pushStateToAppsScript(false);
       }
+      return;
     }
 
-    function fetchAppsScriptJsonp(url) {
-      return new Promise((resolve, reject) => {
-        const cbName = 'smpn1Cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-        const script = document.createElement('script');
-        const timer = setTimeout(() => {
-          cleanup();
-          reject(new Error('Timeout membaca Cloud'));
-        }, 12000);
+    updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+    const localTime = Number(appData._updatedAt || 0);
+    const remoteTime = Number(incoming._updatedAt || 0);
 
-        function cleanup() {
-          clearTimeout(timer);
-          delete window[cbName];
-          if (script.parentNode) script.parentNode.removeChild(script);
-        }
-
-        window[cbName] = function(data) {
-          cleanup();
-          resolve(data);
-        };
-
-        script.onerror = function() {
-          cleanup();
-          reject(new Error('Gagal memuat script Cloud'));
-        };
-
-        const sep = url.includes('?') ? '&' : '?';
-        script.src = `${url}${sep}callback=${cbName}&t=${Date.now()}`;
-        document.body.appendChild(script);
-      });
+    if (!appData._isFreshDefault && !notifyUser && localTime > 0 && remoteTime > 0 && remoteTime < localTime) {
+      await pushStateToAppsScript(false);
+      return;
     }
 
-    async function pullStateFromAppsScript(notifyUser = false) {
-      const url = getAppsScriptUrl();
-      if (!url || isSyncingFromCloud) return;
-      if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 12000)) {
-        return;
-      }
-      isSyncingFromCloud = true;
-      try {
-        let incoming = null;
-        try {
-          incoming = await fetchAppsScriptJsonp(url);
-        } catch (jsonpErr) {
-          const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          const text = await res.text();
-          incoming = JSON.parse((text || '{}').trim() || '{}');
-        }
-
-        const trimmed = JSON.stringify(incoming || {});
-        if (!incoming || !Array.isArray(incoming.rooms) || !incoming.masterStudents) {
-          updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
-          if (!appData._isFreshDefault) {
-            await pushStateToAppsScript(false);
-          }
-          return;
-        }
-
-        updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
-        const localTime = Number(appData?._updatedAt || 0);
-        const remoteTime = Number(incoming._updatedAt || 0);
-
-        if (!appData._isFreshDefault && !notifyUser && localTime > 0 && remoteTime > 0 && remoteTime < localTime) {
-          await pushStateToAppsScript(false);
-          return;
-        }
-
-        if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser || appData._isFreshDefault)) {
-          lastCloudSnapshotHash = trimmed;
-          hasUnsyncedLocalChanges = false;
-          appData = incoming;
-          delete appData._isFreshDefault;
-          localStorage.setItem(STORAGE_KEY, trimmed);
-          rerenderActiveRoleView();
-        }
-        if (notifyUser) {
-          showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Google Sheets sudah dimuat.');
-        }
-      } catch (err) {
-        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
-        if (notifyUser) {
-          showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan kode doGet Apps Script sudah diperbarui ke versi terbaru.');
-        }
-      } finally {
-        isSyncingFromCloud = false;
-      }
+    if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser || appData._isFreshDefault)) {
+      lastCloudSnapshotHash = trimmed;
+      hasUnsyncedLocalChanges = false;
+      appData = incoming;
+      delete appData._isFreshDefault;
+      localStorage.setItem(STORAGE_KEY, trimmed);
+      rerenderActiveRoleView();
     }
-
+    if (notifyUser) {
+      showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Firebase Cloud sudah dimuat.');
+    }
+  } catch (err) {
+    updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
+    if (notifyUser) {
+      showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan URL Firebase & Rules sudah aktif.');
+    }
+  } finally {
+    isSyncingFromCloud = false;
+  }
+}
     /* =========================================================================
        PENCARIAN SISWA LINTAS FORMAT QR / NISN / NAMA
        ========================================================================= */
