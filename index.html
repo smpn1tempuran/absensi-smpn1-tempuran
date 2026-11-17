@@ -1367,17 +1367,19 @@
     let cloudPushTimer = null;
     let lastCloudSnapshotHash = '';
     let isSyncingFromCloud = false;
+    let hasUnsyncedLocalChanges = false;
+    let lastLocalMutationAt = 0;
 
     function updateCloudPillUI(status, text) {
       const pill = document.getElementById('cloudSyncPill');
-      const adminBadge = document.getElementById('adminCloudStatusBadge');
+      const badge = document.getElementById('adminCloudStatusBadge');
       if (pill) {
         pill.textContent = text;
         pill.className = status === 'online' ? 'role-pill pill-teacher' : 'role-pill pill-guest';
       }
-      if (adminBadge) {
-        adminBadge.textContent = text;
-        adminBadge.className = status === 'online' ? 'badge badge-success' : 'badge badge-warning';
+      if (badge) {
+        badge.textContent = text;
+        badge.className = status === 'online' ? 'badge badge-success' : 'badge badge-warning';
       }
     }
 
@@ -1387,10 +1389,12 @@
         localStorage.setItem(STORAGE_KEY, serialized);
       } catch (e) {}
       if (!skipCloud) {
+        hasUnsyncedLocalChanges = true;
+        lastLocalMutationAt = Date.now();
         clearTimeout(cloudPushTimer);
         cloudPushTimer = setTimeout(() => {
           pushStateToAppsScript(false);
-        }, 250);
+        }, 200);
       }
     }
 
@@ -1398,7 +1402,7 @@
       const url = getAppsScriptUrl();
       if (!url || !appData) return;
       const serialized = JSON.stringify(appData);
-      if (!notifyUser && serialized === lastCloudSnapshotHash) return;
+      if (!notifyUser && !hasUnsyncedLocalChanges && serialized === lastCloudSnapshotHash) return;
 
       try {
         updateCloudPillUI('online', '🔄 Menyinkronkan...');
@@ -1408,9 +1412,11 @@
           body: serialized
         });
         lastCloudSnapshotHash = serialized;
+        hasUnsyncedLocalChanges = false;
+        lastLocalMutationAt = Date.now();
         updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
         if (notifyUser) {
-          showToast('success', 'Data Terkirim ke Google Sheets', 'Cek sel A1/B1 di Google Sheets Anda — data telah tersimpan!');
+          showToast('success', 'Data Terkirim ke Google Sheets', 'Seluruh data & riwayat terbaru telah tersimpan di Cloud!');
         }
       } catch (e) {
         updateCloudPillUI('offline', '⚠️ Gagal Kirim Cloud');
@@ -1423,6 +1429,9 @@
     async function pullStateFromAppsScript(notifyUser = false) {
       const url = getAppsScriptUrl();
       if (!url || isSyncingFromCloud) return;
+      if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 6500)) {
+        return;
+      }
       isSyncingFromCloud = true;
       try {
         const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' });
@@ -1439,8 +1448,9 @@
         const incoming = JSON.parse(trimmed);
         if (incoming && Array.isArray(incoming.rooms) && incoming.masterStudents) {
           updateCloudPillUI('online', '🟢 Google Sheets Cloud Aktif');
-          if (trimmed !== lastCloudSnapshotHash) {
+          if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser)) {
             lastCloudSnapshotHash = trimmed;
+            hasUnsyncedLocalChanges = false;
             appData = incoming;
             localStorage.setItem(STORAGE_KEY, trimmed);
             rerenderActiveRoleView();
@@ -1450,48 +1460,53 @@
           }
         }
       } catch (err) {
-        updateCloudPillUI('offline', '⚠️ Belum Terbaca dari Cloud');
+        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
         if (notifyUser) {
-          showToast('error', 'Gagal Membaca Google Sheets', 'Pastikan deployment Apps Script diatur ke "Siapa saja" (Anyone) dan sudah memakai Versi baru.');
+          showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan URL Web App Apps Script benar dan diakses "Siapa saja".');
         }
       } finally {
         isSyncingFromCloud = false;
       }
     }
 
-    function rerenderActiveRoleView() {
-      const role = currentSession.role;
-      if (role === 'public') {
-        refreshPagiUI();
-      } else if (role === 'guru' || role === 'admin') {
-        refreshWorkspaceUI();
-        if (!document.getElementById('wsTabAgamaRekap').classList.contains('hidden')) renderAgamaSholatRekap();
-        if (!document.getElementById('wsTabAdmin').classList.contains('hidden')) renderAdminPanel();
-      } else if (role === 'guru_wali') {
-        refreshGuruWaliUI();
-      } else if (role === 'wali_kelas' || role === 'guru_bk') {
-        refreshHomeroomDashboard();
-      }
-    }
-
     function saveAppsScriptUrlConfig() {
-      const val = document.getElementById('adminAppsScriptUrlInput').value.trim();
-      if (!val || !val.startsWith('https://script.google.com/')) {
-        showToast('error', 'URL Tidak Valid', 'Masukkan URL Web App Apps Script yang berakhiran /exec');
+      const urlInp = document.getElementById('adminAppsScriptUrlInput');
+      const val = (urlInp?.value || '').trim();
+      if (!val || !val.startsWith('https://')) {
+        showToast('error', 'URL Tidak Valid', 'Masukkan URL Web App Apps Script yang diawali https://');
         return;
       }
       localStorage.setItem(APPS_SCRIPT_URL_KEY, val);
       pullStateFromAppsScript(true);
     }
 
-    function showToast(type, title, desc = '') {
+    function rerenderActiveRoleView() {
+      if (currentSession.role === 'public') {
+        refreshPagiUI();
+      } else if (currentSession.role === 'guru_wali') {
+        refreshGuruWaliUI();
+      } else if (currentSession.role === 'wali_kelas' || currentSession.role === 'guru_bk') {
+        refreshHomeroomDashboard();
+      } else {
+        refreshWorkspaceUI();
+      }
+    }
+
+    /* =====================================================================
+       TOAST, MODAL, BEEP & QR GENERATOR
+       ===================================================================== */
+    function showToast(type, title, desc) {
       const wrap = document.getElementById('toastContainer');
       if (!wrap) return;
       const el = document.createElement('div');
       el.className = `toast ${type}`;
-      el.innerHTML = `<strong>${title}</strong>${desc ? `<div>${desc}</div>` : ''}`;
+      el.innerHTML = `<strong style="display:block; margin-bottom:2px;">${title}</strong><span>${desc || ''}</span>`;
       wrap.appendChild(el);
-      setTimeout(() => { el.remove(); }, 3400);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.25s';
+        setTimeout(() => el.remove(), 260);
+      }, 3400);
     }
 
     function openModal(id) {
@@ -1504,234 +1519,217 @@
       if (el) el.classList.add('hidden');
     }
 
-    /* =====================================================================
-       QR CODE GENERATOR SVG STANDAR ISO (NAVY #0a1931)
-       ===================================================================== */
-    function createQrSvg(text) {
-      const payload = String(text || 'SMPN1').trim();
-      if (typeof qrcode === 'function') {
-        try {
-          const qr = qrcode(0, 'M');
-          qr.addData(payload);
-          qr.make();
-          const count = qr.getModuleCount();
-          const pad = 2;
-          const total = count + pad * 2;
-          let rects = '';
-          for (let r = 0; r < count; r++) {
-            for (let c = 0; c < count; c++) {
-              if (qr.isDark(r, c)) {
-                rects += `<rect x="${c + pad}" y="${r + pad}" width="1" height="1" fill="#0a1931"/>`;
-              }
-            }
-          }
-          return `<svg viewBox="0 0 ${total} ${total}" width="100%" height="100%" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${total}" height="${total}" fill="#ffffff"/>${rects}</svg>`;
-        } catch (err) {}
-      }
-      return `<div style="display:flex;align-items:center;justify-content:center;height:100%;font-weight:900;font-size:0.8rem;color:#0a1931;">${payload}</div>`;
-    }
-
     function playScanBeep() {
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+        osc.frequency.value = 1046;
+        gain.gain.value = 0.08;
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
-        osc.stop(ctx.currentTime + 0.16);
+        osc.stop(ctx.currentTime + 0.11);
       } catch (e) {}
     }
 
+    function createQrSvg(text) {
+      if (typeof qrcode === 'function') {
+        try {
+          const qr = qrcode(0, 'M');
+          qr.addData(String(text || 'SMPN1'));
+          qr.make();
+          return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+        } catch (e) {}
+      }
+      return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#fff"/><text x="50" y="54" font-size="11" text-anchor="middle" fill="#0a1931">${text}</text></svg>`;
+    }
+
     /* =====================================================================
-       KAMERA SCANNER QR (PAGI, GURU MAPEL, ABSEN SHOLAT, GURU WALI)
+       PEMINDAI KAMERA QR UNIVERSAL (PAGI, MAPEL, GURU WALI, SHOLAT AGAMA)
        ===================================================================== */
     function stopAllCameras() {
-      if (activeScanInterval) { clearInterval(activeScanInterval); activeScanInterval = null; }
+      if (activeScanInterval) {
+        clearInterval(activeScanInterval);
+        activeScanInterval = null;
+      }
       if (activeCameraStream) {
-        try { activeCameraStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        activeCameraStream.getTracks().forEach(t => t.stop());
         activeCameraStream = null;
       }
       ['pagi', 'ws', 'sholat', 'gw'].forEach(prefix => {
-        const v = document.getElementById(`${prefix}Video`);
-        const ov = document.getElementById(`${prefix}Overlay`);
+        const vid = document.getElementById(`${prefix}Video`);
+        const ovl = document.getElementById(`${prefix}Overlay`);
         const ph = document.getElementById(`${prefix}CamPlaceholder`);
-        const capPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
-        const bStart = document.getElementById(`btnStart${capPrefix}Cam`);
-        const bStop = document.getElementById(`btnStop${capPrefix}Cam`);
-        if (v) {
-          try { v.pause(); } catch (e) {}
-          v.srcObject = null;
-          v.classList.add('hidden');
-        }
-        if (ov) ov.classList.add('hidden');
+        const bStart = document.getElementById(`btnStart${prefix.charAt(0).toUpperCase() + prefix.slice(1)}Cam`);
+        const bStop = document.getElementById(`btnStop${prefix.charAt(0).toUpperCase() + prefix.slice(1)}Cam`);
+        if (vid) { vid.srcObject = null; vid.classList.add('hidden'); }
+        if (ovl) ovl.classList.add('hidden');
         if (ph) ph.classList.remove('hidden');
         if (bStart) bStart.classList.remove('hidden');
         if (bStop) bStop.classList.add('hidden');
       });
     }
 
-    async function acquireCameraStreamWithFallback() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Browser tidak mendukung akses kamera atau halaman tidak dibuka lewat HTTPS.');
-      }
-      const attempts = [
-        { video: { facingMode: { ideal: 'environment' } }, audio: false },
-        { video: { facingMode: 'environment' }, audio: false },
-        { video: true, audio: false }
-      ];
-      let lastError = null;
-      for (const constraints of attempts) {
-        try {
-          return await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (err) {
-          lastError = err;
-          if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-            throw err;
-          }
-        }
-      }
-      throw lastError || new Error('Perangkat kamera tidak ditemukan.');
-    }
-
     async function startQrCamera(mode) {
       stopAllCameras();
-      stopIzinCamera();
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 120));
 
-      const v = document.getElementById(`${mode}Video`);
-      const ov = document.getElementById(`${mode}Overlay`);
+      const vid = document.getElementById(`${mode}Video`);
+      const ovl = document.getElementById(`${mode}Overlay`);
       const ph = document.getElementById(`${mode}CamPlaceholder`);
       const cap = mode.charAt(0).toUpperCase() + mode.slice(1);
       const bStart = document.getElementById(`btnStart${cap}Cam`);
       const bStop = document.getElementById(`btnStop${cap}Cam`);
 
-      if (!v) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('error', 'Browser Tidak Mendukung Kamera', 'Gunakan Google Chrome terbaru atau input kode manual.');
+        return;
+      }
 
       try {
-        activeCameraStream = await acquireCameraStreamWithFallback();
-        v.setAttribute('playsinline', '');
-        v.setAttribute('muted', '');
-        v.muted = true;
-        v.srcObject = activeCameraStream;
-        v.classList.remove('hidden');
-        await v.play();
+        try {
+          activeCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+          });
+        } catch (errEnv) {
+          activeCameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
 
-        if (ov) ov.classList.remove('hidden');
+        vid.srcObject = activeCameraStream;
+        await vid.play();
+
         if (ph) ph.classList.add('hidden');
+        if (vid) vid.classList.remove('hidden');
+        if (ovl) ovl.classList.remove('hidden');
         if (bStart) bStart.classList.add('hidden');
         if (bStop) bStop.classList.remove('hidden');
 
-        const scanCanvas = document.createElement('canvas');
-        const scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+        const canvasHigh = document.createElement('canvas');
+        const ctxHigh = canvasHigh.getContext('2d', { willReadFrequently: true });
+        const canvasMid = document.createElement('canvas');
+        const ctxMid = canvasMid.getContext('2d', { willReadFrequently: true });
         const nativeDetector = ('BarcodeDetector' in window) ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
 
-        const handleDecodedValue = (rawText) => {
-          const raw = String(rawText || '').trim().toUpperCase();
+        const handleDecoded = (raw) => {
+          const code = String(raw || '').trim().toUpperCase();
+          if (!code) return;
           const now = Date.now();
-          if (raw && (raw !== lastQrHit.code || now - lastQrHit.time > 2500)) {
-            lastQrHit = { code: raw, time: now };
-            playScanBeep();
-            if (mode === 'pagi') processPagiScan(raw);
-            else if (mode === 'ws') processWsScan(raw);
-            else if (mode === 'sholat') processWsSholatScan(raw);
-            else if (mode === 'gw') processGuruWaliScan(raw);
-          }
+          if (code === lastQrHit.code && now - lastQrHit.time < 2600) return;
+          lastQrHit = { code, time: now };
+          playScanBeep();
+
+          if (mode === 'pagi') processPagiScan(code);
+          else if (mode === 'ws') processWsScan(code);
+          else if (mode === 'sholat') processWsSholatScan(code);
+          else if (mode === 'gw') processGuruWaliScan(code);
         };
 
         activeScanInterval = setInterval(async () => {
-          if (!activeCameraStream || v.readyState < 2 || !v.videoWidth) return;
+          if (!activeCameraStream || vid.readyState < 2 || !vid.videoWidth) return;
           try {
-            if (typeof jsQR === 'function') {
-              const scales = [Math.min(720, v.videoWidth), Math.min(420, v.videoWidth)];
-              for (const targetW of scales) {
-                const scale = targetW / v.videoWidth;
-                scanCanvas.width = targetW;
-                scanCanvas.height = Math.round(v.videoHeight * scale);
-                scanCtx.drawImage(v, 0, 0, scanCanvas.width, scanCanvas.height);
-                const imgData = scanCtx.getImageData(0, 0, scanCanvas.width, scanCanvas.height);
-                const decoded = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
-                if (decoded && decoded.data) {
-                  handleDecodedValue(decoded.data);
-                  return;
-                }
+            if (nativeDetector) {
+              const codes = await nativeDetector.detect(vid);
+              if (codes && codes.length > 0 && codes[0].rawValue) {
+                handleDecoded(codes[0].rawValue);
+                return;
               }
             }
-            if (nativeDetector) {
-              const codes = await nativeDetector.detect(v);
-              if (codes && codes.length && codes[0].rawValue) {
-                handleDecodedValue(codes[0].rawValue);
+            if (typeof jsQR === 'function') {
+              const vw = vid.videoWidth;
+              const vh = vid.videoHeight;
+              const scale1 = Math.min(1, 720 / Math.max(vw, vh));
+              canvasHigh.width = Math.round(vw * scale1);
+              canvasHigh.height = Math.round(vh * scale1);
+              ctxHigh.drawImage(vid, 0, 0, canvasHigh.width, canvasHigh.height);
+              const img1 = ctxHigh.getImageData(0, 0, canvasHigh.width, canvasHigh.height);
+              const res1 = jsQR(img1.data, img1.width, img1.height, { inversionAttempts: 'attemptBoth' });
+              if (res1 && res1.data) {
+                handleDecoded(res1.data);
+                return;
+              }
+
+              const scale2 = Math.min(1, 420 / Math.max(vw, vh));
+              canvasMid.width = Math.round(vw * scale2);
+              canvasMid.height = Math.round(vh * scale2);
+              ctxMid.drawImage(vid, 0, 0, canvasMid.width, canvasMid.height);
+              const img2 = ctxMid.getImageData(0, 0, canvasMid.width, canvasMid.height);
+              const res2 = jsQR(img2.data, img2.width, img2.height, { inversionAttempts: 'attemptBoth' });
+              if (res2 && res2.data) {
+                handleDecoded(res2.data);
               }
             }
           } catch (e) {}
-        }, 220);
+        }, 260);
       } catch (err) {
-        stopAllCameras();
-        const reason = (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'))
-          ? 'Izin kamera diblokir browser. Klik ikon pengaturan/gembok di samping alamat web lalu pilih Izinkan Kamera.'
-          : (err && err.name === 'NotReadableError')
-          ? 'Kamera sedang dipakai oleh aplikasi lain. Tutup aplikasi kamera lain lalu coba lagi.'
-          : `Kamera tidak dapat dibuka (${err?.message || 'Periksa izin kamera'}). Buka tautan langsung di Google Chrome.`;
-        showToast('error', 'Kamera Tidak Dapat Dibuka', reason);
+        showToast('error', 'Kamera Tidak Dapat Dibuka', `Pastikan izin kamera di Chrome diizinkan (${err.name || 'Error'}).`);
       }
-    }
-
-    /* =====================================================================
-       1. LOGIKA PORTAL PUBLIK: ABSEN PAGI & IZIN FOTO LANGSUNG
-       ===================================================================== */
-    function switchPublicTab(tab) {
-      stopAllCameras();
-      stopIzinCamera();
-      document.getElementById('publicPagiSection').classList.toggle('hidden', tab !== 'pagi');
-      document.getElementById('publicIzinSection').classList.toggle('hidden', tab !== 'izin');
-      document.getElementById('pubTabPagi').classList.toggle('active', tab === 'pagi');
-      document.getElementById('pubTabIzin').classList.toggle('active', tab === 'izin');
-      if (tab === 'izin') populateIzinStudentsByClass();
     }
 
     function findStudentAcrossAllClasses(query) {
       const q = String(query || '').trim().toUpperCase();
       if (!q) return null;
+
       for (const cls of ALL_CLASSES) {
         const list = appData.masterStudents[cls] || [];
-        const exact = list.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q));
-        if (exact) return { student: exact, cls };
-      }
-      for (const room of appData.rooms) {
-        const list = appData.roomStudents[room.id] || [];
-        const exact = list.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q));
-        if (exact) {
-          const mappedCls = normalizeClassCode(exact.kelas) || 'VIIA';
-          const masterMatch = (appData.masterStudents[mappedCls] || []).find(m => m.nisn === exact.nisn || m.name === exact.name) || exact;
-          return { student: masterMatch, cls: mappedCls };
+        for (const st of list) {
+          if (st.id.toUpperCase() === q || (st.nisn && st.nisn.toUpperCase() === q)) {
+            return { cls, student: st };
+          }
         }
       }
-      const prefixStripped = q.replace(/^[A-Z0-9]+-(?=(VII|VIII|IX)[A-G]-\d+)/, '');
-      if (prefixStripped !== q) {
+
+      const suffixMatch = q.match(/((?:IX|VIII|VII)[A-G]-\d+)$/);
+      if (suffixMatch) {
+        const tail = suffixMatch[1];
         for (const cls of ALL_CLASSES) {
-          const list = appData.masterStudents[cls] || [];
-          const byStripped = list.find(s => s.id.toUpperCase() === prefixStripped);
-          if (byStripped) return { student: byStripped, cls };
+          const st = (appData.masterStudents[cls] || []).find(x => x.id.toUpperCase() === tail);
+          if (st) return { cls, student: st };
         }
       }
+
+      for (const roomId of Object.keys(appData.roomStudents || {})) {
+        const rList = appData.roomStudents[roomId] || [];
+        const rSt = rList.find(x => x.id.toUpperCase() === q || (x.nisn && x.nisn.toUpperCase() === q));
+        if (rSt) {
+          const normCls = normalizeClassCode(rSt.kelas);
+          if (ALL_CLASSES.includes(normCls)) {
+            const mSt = (appData.masterStudents[normCls] || []).find(m => m.name === rSt.name || (rSt.nisn && m.nisn === rSt.nisn));
+            if (mSt) return { cls: normCls, student: mSt };
+          }
+        }
+      }
+
       for (const cls of ALL_CLASSES) {
-        const list = appData.masterStudents[cls] || [];
-        const byName = list.find(s => s.name.toUpperCase().includes(q));
-        if (byName) return { student: byName, cls };
+        const st = (appData.masterStudents[cls] || []).find(x => x.name.toUpperCase().includes(q));
+        if (st) return { cls, student: st };
       }
       return null;
     }
 
-    function recordPagiStatus(cls, studentId, status) {
+    /* =====================================================================
+       1. PORTAL PUBLIK (ABSEN PAGI & IZIN FOTO LANGSUNG)
+       ===================================================================== */
+    function switchPublicTab(tab) {
+      stopAllCameras();
+      stopIzinCamera();
+      const isPagi = tab === 'pagi';
+      document.getElementById('publicPagiSection').classList.toggle('hidden', !isPagi);
+      document.getElementById('publicIzinSection').classList.toggle('hidden', isPagi);
+      document.getElementById('pubTabPagi').classList.toggle('active', isPagi);
+      document.getElementById('pubTabIzin').classList.toggle('active', !isPagi);
+    }
+
+    function setPagiAttendance(cls, stId, status) {
       const dateStr = document.getElementById('pagiDateInput').value || getTodayISO();
       if (!appData.pagiAttendance[dateStr]) appData.pagiAttendance[dateStr] = {};
       if (!appData.pagiAttendance[dateStr][cls]) appData.pagiAttendance[dateStr][cls] = {};
       const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      appData.pagiAttendance[dateStr][cls][studentId] = { status, time };
+      appData.pagiAttendance[dateStr][cls][stId] = { status, time };
       saveAppData();
       refreshPagiUI();
     }
@@ -1739,12 +1737,12 @@
     function processPagiScan(code) {
       const found = findStudentAcrossAllClasses(code);
       if (!found) {
-        showToast('error', 'Siswa Tidak Ditemukan', `Kode/Nama "${code}" tidak terdaftar.`);
+        showToast('error', 'Siswa Tidak Ditemukan', `"${code}" tidak terdaftar di data induk.`);
         return;
       }
       document.getElementById('pagiClassSelect').value = found.cls;
-      recordPagiStatus(found.cls, found.student.id, 'Hadir');
-      showToast('success', `Absen Pagi: ${found.student.name}`, `Kelas ${CLASS_LABELS[found.cls]}`);
+      setPagiAttendance(found.cls, found.student.id, 'Hadir');
+      showToast('success', `Hadir Pagi: ${found.student.name}`, `Kelas ${CLASS_LABELS[found.cls]}`);
     }
 
     function handlePagiManualSubmit(e) {
@@ -1759,30 +1757,29 @@
       const cls = document.getElementById('pagiClassSelect').value || 'VIIA';
       const dateStr = document.getElementById('pagiDateInput').value || getTodayISO();
       const students = appData.masterStudents[cls] || [];
-      const dayMap = (appData.pagiAttendance[dateStr] && appData.pagiAttendance[dateStr][cls]) || {};
+      const clsMap = appData.pagiAttendance?.[dateStr]?.[cls] || {};
 
-      let hadirCount = 0;
-      students.forEach(s => { if (dayMap[s.id] && (dayMap[s.id].status === 'Hadir' || dayMap[s.id].status === 'Telat')) hadirCount++; });
-      document.getElementById('pagiSummaryBadge').textContent = `Hadir Pagi: ${hadirCount} / ${students.length} Siswa`;
+      let hadir = 0;
+      students.forEach(s => {
+        if (clsMap[s.id] && (clsMap[s.id].status === 'Hadir' || clsMap[s.id].status === 'Telat')) hadir++;
+      });
+      document.getElementById('pagiSummaryBadge').textContent = `Hadir: ${hadir} / ${students.length} Siswa`;
 
-      const tbody = document.getElementById('pagiTableBody');
-      tbody.innerHTML = students.map((s, i) => {
-        const rec = dayMap[s.id];
+      document.getElementById('pagiTableBody').innerHTML = students.map((s, idx) => {
+        const rec = clsMap[s.id];
         let badge = `<span class="badge">Belum</span>`;
         if (rec) {
-          const bCls = rec.status === 'Hadir' ? 'badge-success' : rec.status === 'Telat' ? 'badge-warning' : 'badge-info';
-          badge = `<span class="badge ${bCls}">${rec.status} (${rec.time})</span>`;
+          badge = `<span class="badge ${rec.status === 'Hadir' ? 'badge-success' : 'badge-warning'}">${rec.status} (${rec.time})</span>`;
         }
         return `
           <tr>
-            <td>${i + 1}</td>
-            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.id} • NISN: ${s.nisn || '-'}</div></td>
+            <td>${idx + 1}</td>
+            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.id} • ${s.nisn || '-'}</div></td>
             <td>${badge}</td>
             <td>
-              <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                <button type="button" class="btn btn-success btn-xs" onclick="recordPagiStatus('${cls}','${s.id}','Hadir')">Hadir</button>
-                <button type="button" class="btn btn-warning btn-xs" onclick="recordPagiStatus('${cls}','${s.id}','Telat')">Telat</button>
-                <button type="button" class="btn btn-info btn-xs" onclick="recordPagiStatus('${cls}','${s.id}','Izin')">Izin</button>
+              <div style="display:flex; gap:4px;">
+                <button type="button" class="btn btn-success btn-xs" onclick="setPagiAttendance('${cls}','${s.id}','Hadir')">Hadir</button>
+                <button type="button" class="btn btn-warning btn-xs" onclick="setPagiAttendance('${cls}','${s.id}','Telat')">Telat</button>
               </div>
             </td>
           </tr>
@@ -1790,7 +1787,6 @@
       }).join('');
     }
 
-    /* Kamera Foto Langsung Izin (Wajah + Surat) */
     function populateIzinStudentsByClass() {
       const cls = document.getElementById('izinClassSelect').value || 'VIIA';
       const list = appData.masterStudents[cls] || [];
@@ -1800,21 +1796,23 @@
     }
 
     async function startIzinCamera() {
-      stopAllCameras();
       stopIzinCamera();
-      const box = document.getElementById('izinCamBox');
-      const v = document.getElementById('izinVideo');
       try {
-        izinStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: izinFacingMode }, audio: false });
-        v.srcObject = izinStream;
-        v.style.transform = izinFacingMode === 'user' ? 'scaleX(-1)' : 'none';
-        await v.play();
-        box.classList.remove('hidden');
+        izinStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: izinFacingMode },
+          audio: false
+        });
+        const vid = document.getElementById('izinVideo');
+        vid.srcObject = izinStream;
+        vid.style.transform = izinFacingMode === 'user' ? 'scaleX(-1)' : 'none';
+        await vid.play();
+
+        document.getElementById('izinCamBox').classList.remove('hidden');
+        document.getElementById('btnOpenIzinCam').classList.add('hidden');
         document.getElementById('btnSwitchIzinCam').classList.remove('hidden');
         document.getElementById('btnSnapIzinPhoto').classList.remove('hidden');
-        document.getElementById('btnOpenIzinCam').textContent = '🔄 Mulai Ulang Kamera';
       } catch (err) {
-        showToast('error', 'Kamera Tidak Tersedia', 'Izinkan akses kamera di browser HP Anda untuk mengambil foto wajah & surat izin.');
+        showToast('error', 'Kamera Foto Gagal Dibuka', 'Izinkan akses kamera pada browser HP/laptop Anda.');
       }
     }
 
@@ -1824,107 +1822,87 @@
     }
 
     function stopIzinCamera() {
-      if (izinStream) { izinStream.getTracks().forEach(t => t.stop()); izinStream = null; }
+      if (izinStream) {
+        izinStream.getTracks().forEach(t => t.stop());
+        izinStream = null;
+      }
       const box = document.getElementById('izinCamBox');
       if (box) box.classList.add('hidden');
-      document.getElementById('btnSwitchIzinCam')?.classList.add('hidden');
-      document.getElementById('btnSnapIzinPhoto')?.classList.add('hidden');
+      const bOpen = document.getElementById('btnOpenIzinCam');
+      if (bOpen) bOpen.classList.remove('hidden');
+      const bSw = document.getElementById('btnSwitchIzinCam');
+      if (bSw) bSw.classList.add('hidden');
+      const bSnap = document.getElementById('btnSnapIzinPhoto');
+      if (bSnap) bSnap.classList.add('hidden');
     }
 
     function captureIzinPhoto() {
-      const v = document.getElementById('izinVideo');
-      if (!v || v.readyState < 2) return;
+      const vid = document.getElementById('izinVideo');
+      if (!vid || !vid.videoWidth) return;
       const canvas = document.createElement('canvas');
-      canvas.width = 420;
-      canvas.height = Math.round((v.videoHeight / v.videoWidth) * 420) || 315;
+      const scale = Math.min(1, 640 / Math.max(vid.videoWidth, vid.videoHeight));
+      canvas.width = Math.round(vid.videoWidth * scale);
+      canvas.height = Math.round(vid.videoHeight * scale);
       const ctx = canvas.getContext('2d');
       if (izinFacingMode === 'user') {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
       }
-      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-      if (izinFacingMode === 'user') ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.72);
 
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      let lum = 0;
-      for (let i = 0; i < data.length; i += 16) lum += 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-      if (lum / (data.length / 16) < 35) {
-        showToast('error', 'Foto Terlalu Gelap', 'Pindah ke tempat lebih terang agar wajah dan surat terbaca.');
-        return;
-      }
-
-      const cls = document.getElementById('izinClassSelect').value;
-      const stId = document.getElementById('izinStudentSelect').value;
-      const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
-      ctx.fillStyle = 'rgba(6, 15, 38, 0.78)';
-      ctx.fillRect(0, canvas.height - 26, canvas.width, 26);
-      ctx.fillStyle = '#fde047';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.fillText(`SMPN 1 TEMPURAN • ${st ? st.name : stId} • ${new Date().toLocaleString('id-ID')}`, 8, canvas.height - 9);
-
-      capturedIzinDataUrl = canvas.toDataURL('image/jpeg', 0.45);
-      const prev = document.getElementById('izinCapturedPreview');
-      prev.src = capturedIzinDataUrl;
-      prev.classList.remove('hidden');
-      document.getElementById('izinPhotoStatus').innerHTML = `<strong style="color:var(--success);">✅ Foto wajah & surat berhasil dijepret!</strong>`;
+      const img = document.getElementById('izinCapturedPreview');
+      img.src = capturedIzinDataUrl;
+      img.classList.remove('hidden');
+      document.getElementById('izinPhotoStatus').textContent = '✅ Foto wajah + surat berhasil diambil.';
       stopIzinCamera();
     }
 
     function submitPublicIzin(e) {
       e.preventDefault();
       if (!capturedIzinDataUrl) {
-        showToast('error', 'Foto Wajib Diambil', 'Silakan buka kamera dan jepret foto wajah memegang surat izin terlebih dahulu.');
+        showToast('error', 'Foto Wajib Diambil', 'Silakan ambil foto wajah siswa memegang surat izin terlebih dahulu.');
         return;
       }
       const cls = document.getElementById('izinClassSelect').value;
       const stId = document.getElementById('izinStudentSelect').value;
-      const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
-      const dateStr = document.getElementById('izinDateInput').value || getTodayISO();
+      const date = document.getElementById('izinDateInput').value || getTodayISO();
       const type = document.getElementById('izinTypeSelect').value;
       const reason = document.getElementById('izinReasonInput').value.trim();
+      const st = (appData.masterStudents[cls] || []).find(s => s.id === stId);
 
       appData.izinRequests.unshift({
-        id: `IZN-${Date.now().toString(36).toUpperCase()}`,
-        date: dateStr,
+        id: 'IZN-' + Date.now().toString(36).toUpperCase(),
         cls,
         studentId: stId,
         studentName: st ? st.name : stId,
+        date,
         type,
         reason,
         photo: capturedIzinDataUrl,
-        status: 'Menunggu Verifikasi'
+        status: 'Menunggu'
       });
-      if (appData.izinRequests.length > 25) {
-        appData.izinRequests = appData.izinRequests.slice(0, 25);
-      }
       saveAppData();
 
       e.target.reset();
       document.getElementById('izinDateInput').value = getTodayISO();
       capturedIzinDataUrl = null;
       document.getElementById('izinCapturedPreview').classList.add('hidden');
-      document.getElementById('izinPhotoStatus').textContent = 'Pengajuan terkirim. Klik Buka Kamera Foto jika ingin mengirim lagi.';
-      showToast('success', 'Pengajuan Izin Terkirim', `${st ? st.name : stId} (${CLASS_LABELS[cls]})`);
+      document.getElementById('izinPhotoStatus').textContent = 'Mode upload file dinonaktifkan. Gunakan kamera langsung.';
+      showToast('success', 'Pengajuan Izin Terkirim', `${st ? st.name : stId} (${CLASS_LABELS[cls]}) berhasil dikirim.`);
     }
 
     /* =====================================================================
-       2. SISTEM LOGIN MULTI-PERAN
+       2. LOGIN & ROUTING PERAN
        ===================================================================== */
     function openLoginModal() {
-      loadAppData();
-      populateLoginRoomDropdown();
+      document.getElementById('loginRoomSelect').innerHTML = appData.rooms.map(r =>
+        `<option value="${r.id}">${r.type} — ${r.name}</option>`
+      ).join('');
       document.getElementById('loginPinInput').value = '';
       document.getElementById('loginErrorMsg').classList.add('hidden');
       handleLoginRoleChange();
       openModal('loginModal');
-    }
-
-    function populateLoginRoomDropdown() {
-      const sel = document.getElementById('loginRoomSelect');
-      if (!sel) return;
-      sel.innerHTML = appData.rooms.map(r =>
-        `<option value="${r.id}">[${r.type}] ${r.name} (${r.teacher})</option>`
-      ).join('');
     }
 
     function handleLoginRoleChange() {
@@ -1944,60 +1922,46 @@
         const roomId = document.getElementById('loginRoomSelect').value;
         const room = appData.rooms.find(r => r.id === roomId);
         if (!room || pin !== String(room.pin)) {
-          errEl.textContent = 'PIN Guru tidak sesuai untuk mata pelajaran/ekskul ini.';
+          errEl.textContent = 'PIN Guru tidak sesuai.';
           errEl.classList.remove('hidden');
           return;
         }
-        currentSession = { role: 'guru', roomId: room.id };
-        closeModal('loginModal');
-        ensureRoomClassPopulated(room.id, 'VIIA');
-        applySessionView();
-        showToast('success', `Selamat Datang, ${room.teacher}`, room.name);
+        currentSession = { role: 'guru', roomId };
       } else if (role === 'guru_wali') {
         if (pin !== String(appData.guruWaliPin || '4040')) {
-          errEl.textContent = 'PIN Guru Wali salah (default: 4040).';
+          errEl.textContent = 'PIN Guru Wali salah.';
           errEl.classList.remove('hidden');
           return;
         }
         currentSession = { role: 'guru_wali' };
-        closeModal('loginModal');
-        applySessionView();
-        showToast('success', 'Login Guru Wali Berhasil', 'Mode Khusus Absen Sholat Dzuhur');
       } else if (role === 'wali_kelas') {
         const cls = document.getElementById('loginWaliClassSelect').value;
-        const expected = (appData.waliPins && appData.waliPins[cls]) || '2026';
-        if (pin !== String(expected)) {
-          errEl.textContent = `PIN Wali Kelas ${CLASS_LABELS[cls]} salah (default: 2026).`;
+        if (pin !== String(appData.waliPins?.[cls] || '2026')) {
+          errEl.textContent = `PIN Wali Kelas ${cls} salah.`;
           errEl.classList.remove('hidden');
           return;
         }
         currentSession = { role: 'wali_kelas', waliClass: cls };
-        closeModal('loginModal');
-        applySessionView();
-        showToast('success', `Login Wali Kelas ${CLASS_LABELS[cls]}`, 'Laporan Terpadu Siap');
       } else if (role === 'guru_bk') {
         const lvl = document.getElementById('loginBkLevelSelect').value;
-        const expected = (appData.bkPins && appData.bkPins[lvl]) || '3030';
-        if (pin !== String(expected)) {
-          errEl.textContent = `PIN Guru BK Kelas ${lvl} salah (default: 3030).`;
+        if (pin !== String(appData.bkPins?.[lvl] || '3030')) {
+          errEl.textContent = `PIN Guru BK Kelas ${lvl} salah.`;
           errEl.classList.remove('hidden');
           return;
         }
         currentSession = { role: 'guru_bk', bkLevel: lvl };
-        closeModal('loginModal');
-        applySessionView();
-        showToast('success', `Login Guru BK Kelas ${lvl}`, 'Pemantauan Terpadu Aktif');
       } else if (role === 'admin') {
         if (pin !== String(appData.adminPin || '9999')) {
-          errEl.textContent = 'PIN Master Admin salah (default: 9999).';
+          errEl.textContent = 'PIN Admin Sekolah salah.';
           errEl.classList.remove('hidden');
           return;
         }
         currentSession = { role: 'admin', roomId: appData.rooms[0]?.id || 'mapel_mtk' };
-        closeModal('loginModal');
-        applySessionView();
-        showToast('success', 'Login Admin Sekolah Berhasil', 'Akses Penuh Sistem');
       }
+
+      closeModal('loginModal');
+      applySessionView();
+      showToast('success', 'Login Berhasil', 'Selamat datang di Sistem Absensi SMPN 1 Tempuran.');
     }
 
     function logoutRole() {
@@ -2005,152 +1969,178 @@
       stopIzinCamera();
       currentSession = { role: 'public', roomId: 'mapel_mtk' };
       applySessionView();
-      showToast('success', 'Keluar dari Sesi', 'Kembali ke Portal Publik');
+      showToast('success', 'Keluar Sesi', 'Kembali ke Portal Publik.');
     }
 
     function applySessionView() {
       stopAllCameras();
       const role = currentSession.role;
-      const pubView = document.getElementById('publicPortalView');
-      const wsView = document.getElementById('teacherWorkspaceView');
-      const gwView = document.getElementById('guruWaliWorkspaceView');
-      const hrView = document.getElementById('homeroomDashboardView');
+      const pubV = document.getElementById('publicPortalView');
+      const wsV = document.getElementById('teacherWorkspaceView');
+      const gwV = document.getElementById('guruWaliWorkspaceView');
+      const hrV = document.getElementById('homeroomDashboardView');
 
-      pubView.classList.toggle('hidden', role !== 'public');
-      wsView.classList.toggle('hidden', role !== 'guru' && role !== 'admin');
-      gwView.classList.toggle('hidden', role !== 'guru_wali');
-      hrView.classList.toggle('hidden', role !== 'wali_kelas' && role !== 'guru_bk');
-
-      document.getElementById('btnOpenLogin').classList.toggle('hidden', role !== 'public');
-      document.getElementById('btnLogout').classList.toggle('hidden', role === 'public');
+      pubV.classList.add('hidden');
+      wsV.classList.add('hidden');
+      gwV.classList.add('hidden');
+      hrV.classList.add('hidden');
 
       const badge = document.getElementById('roleBadge');
+      const sub = document.getElementById('headerSubtitle');
+      const bIn = document.getElementById('btnOpenLogin');
+      const bOut = document.getElementById('btnLogout');
+
+      bIn.classList.toggle('hidden', role !== 'public');
+      bOut.classList.toggle('hidden', role === 'public');
+
       if (role === 'public') {
+        pubV.classList.remove('hidden');
         badge.className = 'role-pill pill-guest';
         badge.textContent = 'Mode Publik / Siswa';
+        sub.textContent = 'Sistem Absensi Digital Terpadu • Mode Publik & Siswa';
         refreshPagiUI();
       } else if (role === 'guru' || role === 'admin') {
-        const room = appData.rooms.find(r => r.id === currentSession.roomId) || appData.rooms[0];
-        currentSession.roomId = room.id;
-        const agama = isAgamaRoom(room);
-
-        badge.className = role === 'admin' ? 'role-pill pill-admin' : 'role-pill pill-teacher';
-        badge.textContent = role === 'admin' ? '🛡️ Admin Sekolah' : `👨‍🏫 ${room.name}`;
-
-        document.getElementById('wsRoleBadge').textContent = role === 'admin' ? 'ADMIN SEKOLAH' : room.type.toUpperCase();
-        document.getElementById('wsRoomTitle').textContent = room.name;
-        document.getElementById('wsRoomSub').textContent = `Pengampu: ${room.teacher} • Kode Prefix: ${room.prefix}`;
+        wsV.classList.remove('hidden');
+        const isAdmin = role === 'admin';
+        badge.className = isAdmin ? 'role-pill pill-admin' : 'role-pill pill-teacher';
+        badge.textContent = isAdmin ? '🛡️ Admin Sekolah' : '👨‍🏫 Guru Mapel / Ekskul';
+        sub.textContent = isAdmin ? 'Mode Administrator Sekolah & Bank Data' : 'Mode Guru Pengampu Mata Pelajaran / Ekskul';
 
         const switcher = document.getElementById('adminRoomSwitcher');
-        switcher.classList.toggle('hidden', role !== 'admin');
-        if (role === 'admin') {
-          switcher.innerHTML = appData.rooms.map(r => `<option value="${r.id}" ${r.id === room.id ? 'selected' : ''}>${r.name}</option>`).join('');
+        switcher.classList.toggle('hidden', !isAdmin);
+        if (isAdmin) {
+          switcher.innerHTML = appData.rooms.map(r =>
+            `<option value="${r.id}" ${r.id === currentSession.roomId ? 'selected' : ''}>${r.type} — ${r.name}</option>`
+          ).join('');
         }
-
-        document.getElementById('wsTabBtnSholat').classList.toggle('hidden', !(role === 'admin' || agama));
-        document.getElementById('wsTabBtnAgamaRekap').classList.toggle('hidden', !(role === 'admin' || agama));
-        document.getElementById('wsTabBtnAdmin').classList.toggle('hidden', role !== 'admin');
-
-        populateWsClassFilter(room);
-        switchWsTab(role === 'admin' ? 'admin' : 'scan');
-        refreshWorkspaceUI();
+        setupWorkspaceForActiveRoom();
+        switchWsTab(isAdmin ? 'admin' : 'scan');
       } else if (role === 'guru_wali') {
+        gwV.classList.remove('hidden');
         badge.className = 'role-pill pill-homeroom';
-        badge.textContent = '🕌 Guru Wali (Sholat Dzuhur)';
+        badge.textContent = '🕌 Guru Wali';
+        sub.textContent = 'Mode Khusus Absensi Sholat Dzuhur';
         document.getElementById('guruWaliDateInput').value = getTodayISO();
         refreshGuruWaliUI();
       } else if (role === 'wali_kelas' || role === 'guru_bk') {
+        hrV.classList.remove('hidden');
         badge.className = 'role-pill pill-homeroom';
-        badge.textContent = role === 'wali_kelas' ? `👩‍🏫 Wali Kelas ${CLASS_LABELS[currentSession.waliClass]}` : `🧑‍⚕️ Guru BK Kelas ${currentSession.bkLevel}`;
+        badge.textContent = role === 'guru_bk' ? `🧑‍⚕️ Guru BK ${currentSession.bkLevel}` : `👩‍🏫 Wali Kelas ${currentSession.waliClass}`;
+        sub.textContent = 'Laporan Terpadu Kehadiran Siswa';
         document.getElementById('hrDateInput').value = getTodayISO();
 
         const bkSel = document.getElementById('bkClassSelector');
         bkSel.classList.toggle('hidden', role !== 'guru_bk');
         if (role === 'guru_bk') {
-          const lvlClasses = ALL_CLASSES.filter(c => (
-            currentSession.bkLevel === 'VII' ? c.startsWith('VII') && !c.startsWith('VIII') :
-            currentSession.bkLevel === 'VIII' ? c.startsWith('VIII') : c.startsWith('IX')
-          ));
-          bkSel.innerHTML = lvlClasses.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+          const lvl = currentSession.bkLevel;
+          const levelClasses = ALL_CLASSES.filter(c => c.startsWith(lvl) && (lvl !== 'VII' || !c.startsWith('VIII')));
+          bkSel.innerHTML = levelClasses.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
         }
         refreshHomeroomDashboard();
       }
     }
 
     /* =====================================================================
-       3. WORKSPACE GURU MAPEL / EKSKUL / AGAMA / ADMIN
+       3. WORKSPACE GURU MAPEL, GURU AGAMA, EKSKUL & ADMIN
        ===================================================================== */
-    function ensureRoomClassPopulated(roomId, cls) {
-      const room = appData.rooms.find(r => r.id === roomId);
-      if (!room || isEkskulRoom(room)) return 0;
-      if (!appData.roomStudents[roomId]) appData.roomStudents[roomId] = [];
-      const existing = appData.roomStudents[roomId];
-      const masterList = appData.masterStudents[cls] || [];
-      let added = 0;
-
-      masterList.forEach((ms, idx) => {
-        const already = existing.some(s => normalizeClassCode(s.kelas) === cls && s.name === ms.name);
-        if (!already) {
-          existing.push({
-            id: `${room.prefix}-${cls}-${String(idx + 1).padStart(2, '0')}`,
-            nisn: ms.nisn,
-            name: ms.name,
-            kelas: cls,
-            sesi: ms.sesi || 1
-          });
-          added++;
-        }
-      });
-      if (added > 0) saveAppData();
-      return added;
-    }
-
-    function populateWsClassFilter(room) {
-      const sel = document.getElementById('wsClassFilter');
-      if (isEkskulRoom(room)) {
-        sel.innerHTML = `<option value="ALL">Semua Sesi</option><option value="1">Sesi 1</option><option value="2">Sesi 2</option>`;
-        document.getElementById('btnSyncMasterClass').classList.add('hidden');
-      } else {
-        sel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
-        document.getElementById('btnSyncMasterClass').classList.remove('hidden');
-        ensureRoomClassPopulated(room.id, sel.value);
-      }
+    function getActiveWsRoom() {
+      return appData.rooms.find(r => r.id === currentSession.roomId) || appData.rooms[0];
     }
 
     function handleAdminSwitchRoom() {
-      const newId = document.getElementById('adminRoomSwitcher').value;
-      currentSession.roomId = newId;
-      applySessionView();
+      currentSession.roomId = document.getElementById('adminRoomSwitcher').value;
+      setupWorkspaceForActiveRoom();
     }
 
-    function handleWsClassFilterChange() {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
-      const val = document.getElementById('wsClassFilter').value;
-      if (room && !isEkskulRoom(room)) {
-        const added = ensureRoomClassPopulated(room.id, val);
-        if (added > 0) showToast('success', `Kelas ${CLASS_LABELS[val]} Dimuat`, `${added} siswa otomatis masuk dari Bank Kelas Induk.`);
+    function setupWorkspaceForActiveRoom() {
+      const room = getActiveWsRoom();
+      const isAdmin = currentSession.role === 'admin';
+      const ekskul = isEkskulRoom(room);
+      const agama = isAgamaRoom(room);
+
+      document.getElementById('wsRoleBadge').textContent = isAdmin ? '🛡️ ADMIN SEKOLAH' : room.type.toUpperCase();
+      document.getElementById('wsRoomTitle').textContent = room.name;
+      document.getElementById('wsRoomSub').textContent = `Pengampu: ${room.teacher} • Prefix QR: ${room.prefix}`;
+
+      document.getElementById('wsTabBtnSholat').classList.toggle('hidden', !(agama || isAdmin));
+      document.getElementById('wsTabBtnAgamaRekap').classList.toggle('hidden', !(agama || isAdmin));
+      document.getElementById('wsTabBtnAdmin').classList.toggle('hidden', !isAdmin);
+      document.getElementById('btnSyncMasterClass').classList.toggle('hidden', ekskul);
+
+      const clsSel = document.getElementById('wsClassFilter');
+      if (ekskul) {
+        clsSel.innerHTML = `
+          <option value="ALL">Semua Sesi</option>
+          <option value="1">Sesi 1</option>
+          <option value="2">Sesi 2</option>
+        `;
+      } else {
+        clsSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+        syncClassFromMasterSilently(room.id, clsSel.value);
       }
+
+      const agSel = document.getElementById('agamaSholatClassSelect');
+      if (agSel && !agSel.options.length) {
+        agSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+      }
+
       refreshWorkspaceUI();
+    }
+
+    function syncClassFromMasterSilently(roomId, cls) {
+      const normCls = normalizeClassCode(cls);
+      if (!ALL_CLASSES.includes(normCls)) return;
+      const room = appData.rooms.find(r => r.id === roomId);
+      if (!room || isEkskulRoom(room)) return;
+
+      if (!appData.roomStudents[roomId]) appData.roomStudents[roomId] = [];
+      const existing = appData.roomStudents[roomId];
+      const masterList = appData.masterStudents[normCls] || [];
+      let changed = false;
+
+      masterList.forEach((m, idx) => {
+        const already = existing.some(x => normalizeClassCode(x.kelas) === normCls && (x.name === m.name || (m.nisn && x.nisn === m.nisn)));
+        if (!already) {
+          existing.push({
+            id: `${room.prefix}-${normCls}-${String(idx + 1).padStart(2, '0')}`,
+            nisn: m.nisn || '',
+            name: m.name,
+            kelas: normCls,
+            sesi: 1
+          });
+          changed = true;
+        }
+      });
+      if (changed) saveAppData();
     }
 
     function syncCurrentClassFromMaster() {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const room = getActiveWsRoom();
       const cls = document.getElementById('wsClassFilter').value;
-      if (!room || isEkskulRoom(room)) return;
-      const added = ensureRoomClassPopulated(room.id, cls);
+      syncClassFromMasterSilently(room.id, cls);
       refreshWorkspaceUI();
-      showToast('success', 'Sinkronisasi Kelas Induk', added > 0 ? `${added} siswa baru ditambahkan.` : 'Semua siswa kelas ini sudah lengkap.');
+      showToast('success', 'Sinkronisasi Kelas Berhasil', `Daftar siswa ${CLASS_LABELS[cls] || cls} telah diperbarui.`);
+    }
+
+    function handleWsClassFilterChange() {
+      const room = getActiveWsRoom();
+      const cls = document.getElementById('wsClassFilter').value;
+      if (!isEkskulRoom(room)) {
+        syncClassFromMasterSilently(room.id, cls);
+      }
+      refreshWorkspaceUI();
     }
 
     function getFilteredWsStudents() {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
-      if (!room) return [];
-      const list = appData.roomStudents[room.id] || [];
-      const f = document.getElementById('wsClassFilter').value;
+      const room = getActiveWsRoom();
+      const all = appData.roomStudents[room.id] || [];
+      const filter = document.getElementById('wsClassFilter').value;
       if (isEkskulRoom(room)) {
-        return f === 'ALL' ? list : list.filter(s => String(s.sesi || 1) === String(f));
+        if (!filter || filter === 'ALL') return all;
+        return all.filter(s => String(s.sesi || 1) === String(filter));
       }
-      return list.filter(s => normalizeClassCode(s.kelas) === f);
+      const norm = normalizeClassCode(filter);
+      return all.filter(s => normalizeClassCode(s.kelas) === norm);
     }
 
     function switchWsTab(tab) {
@@ -2164,69 +2154,63 @@
         admin: ['wsTabAdmin', 'wsTabBtnAdmin']
       };
       Object.keys(map).forEach(k => {
-        document.getElementById(map[k][0])?.classList.toggle('hidden', k !== tab);
-        document.getElementById(map[k][1])?.classList.toggle('active', k === tab);
+        document.getElementById(map[k][0]).classList.toggle('hidden', k !== tab);
+        document.getElementById(map[k][1]).classList.toggle('active', k === tab);
       });
+      if (tab === 'kartu') renderQrCards();
       if (tab === 'sholat') renderWsSholatTable();
       if (tab === 'agamaRekap') renderAgamaSholatRekap();
-      if (tab === 'rekap') renderRekapAndStudents();
-      if (tab === 'kartu') renderQrCards();
       if (tab === 'admin') renderAdminPanel();
     }
 
-    function recordWsAttendance(studentId, status, note = '') {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+    function setWsStudentAttendance(stId, status) {
+      const room = getActiveWsRoom();
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
       if (!appData.roomAttendance[room.id]) appData.roomAttendance[room.id] = {};
       if (!appData.roomAttendance[room.id][dateStr]) appData.roomAttendance[room.id][dateStr] = {};
       const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      appData.roomAttendance[room.id][dateStr][studentId] = { status, time, note };
+      appData.roomAttendance[room.id][dateStr][stId] = { status, time };
       saveAppData();
       refreshWorkspaceUI();
     }
 
-    function processWsScan(query) {
-      const q = String(query || '').trim().toUpperCase();
+    function processWsScan(code) {
+      const room = getActiveWsRoom();
+      const q = String(code || '').trim().toUpperCase();
       if (!q) return;
 
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
-      if (!room) return;
+      const allInRoom = appData.roomStudents[room.id] || [];
+      let st = allInRoom.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
 
-      const students = getFilteredWsStudents();
-      let found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
-
-      // Jika kartu menggunakan prefix mapel lain / kode induk (mis. PAI-VIIA-01, VIIA-01, atau NISN)
-      if (!found) {
-        const cross = findStudentAcrossAllClasses(q);
-        if (cross) {
+      if (!st) {
+        const foundMaster = findStudentAcrossAllClasses(q);
+        if (foundMaster) {
           if (!isEkskulRoom(room)) {
-            const filterEl = document.getElementById('wsClassFilter');
-            if (filterEl && filterEl.value !== cross.cls) {
-              filterEl.value = cross.cls;
-            }
-            ensureRoomClassPopulated(room.id, cross.cls);
-            const updatedList = getFilteredWsStudents();
-            found = updatedList.find(s =>
-              (s.nisn && cross.student.nisn && s.nisn === cross.student.nisn) ||
-              s.name.toUpperCase() === cross.student.name.toUpperCase()
-            );
+            syncClassFromMasterSilently(room.id, foundMaster.cls);
+            st = (appData.roomStudents[room.id] || []).find(x => normalizeClassCode(x.kelas) === foundMaster.cls && x.name === foundMaster.student.name);
           } else {
-            const roomList = appData.roomStudents[room.id] || [];
-            found = roomList.find(s =>
-              (s.nisn && cross.student.nisn && s.nisn === cross.student.nisn) ||
-              s.name.toUpperCase() === cross.student.name.toUpperCase()
-            );
+            st = (appData.roomStudents[room.id] || []).find(x => x.name === foundMaster.student.name || (foundMaster.student.nisn && x.nisn === foundMaster.student.nisn));
           }
         }
       }
 
-      if (!found) {
-        showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak ada di kelas/sesi aktif.`);
+      if (!st) {
+        showToast('error', 'Siswa Tidak Ditemukan', `"${code}" tidak terdaftar.`);
         return;
       }
 
-      recordWsAttendance(found.id, 'Hadir', 'Scan QR');
-      showToast('success', `Hadir: ${found.name}`, `${found.kelas} • ${found.id}`);
+      const clsSel = document.getElementById('wsClassFilter');
+      if (!isEkskulRoom(room)) {
+        const stCls = normalizeClassCode(st.kelas);
+        if (ALL_CLASSES.includes(stCls) && clsSel.value !== stCls) {
+          clsSel.value = stCls;
+        }
+      } else if (clsSel.value !== 'ALL' && String(st.sesi || 1) !== String(clsSel.value)) {
+        clsSel.value = String(st.sesi || 1);
+      }
+
+      setWsStudentAttendance(st.id, 'Hadir');
+      showToast('success', `Hadir: ${st.name}`, `${st.id} (${st.kelas})`);
     }
 
     function handleWsManualScan(e) {
@@ -2238,96 +2222,152 @@
     }
 
     function markAllWsPresent() {
-      const students = getFilteredWsStudents();
-      students.forEach(s => recordWsAttendance(s.id, 'Hadir', 'Hadir Semua'));
-      showToast('success', 'Semua Siswa Dihadirkan', `${students.length} siswa ditandai Hadir.`);
+      const list = getFilteredWsStudents();
+      list.forEach(s => setWsStudentAttendance(s.id, 'Hadir'));
+      showToast('success', 'Hadir Semua', `${list.length} siswa ditandai Hadir.`);
     }
 
     function refreshWorkspaceUI() {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
-      if (!room) return;
+      const room = getActiveWsRoom();
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const filterVal = document.getElementById('wsClassFilter').value;
+      document.getElementById('wsActiveGroupBadge').textContent = isEkskulRoom(room) ? (filterVal === 'ALL' ? 'Semua Sesi' : `Sesi ${filterVal}`) : (CLASS_LABELS[filterVal] || filterVal);
+
       const students = getFilteredWsStudents();
-      const att = (appData.roomAttendance[room.id] && appData.roomAttendance[room.id][dateStr]) || {};
-      const f = document.getElementById('wsClassFilter').value;
+      const attMap = appData.roomAttendance?.[room.id]?.[dateStr] || {};
 
-      document.getElementById('wsActiveGroupBadge').textContent = isEkskulRoom(room) ? (f === 'ALL' ? 'Semua Sesi' : `Sesi ${f}`) : CLASS_LABELS[f];
-
-      const tbody = document.getElementById('wsQuickTableBody');
-      tbody.innerHTML = students.map((s, idx) => {
-        const r = att[s.id];
-        let badge = `<span class="badge">Belum</span>`;
+      let h = 0, sCnt = 0, iCnt = 0, aCnt = 0;
+      students.forEach(st => {
+        const r = attMap[st.id];
         if (r) {
-          const bCls = r.status === 'Hadir' ? 'badge-success' : r.status === 'Sakit' ? 'badge-warning' : r.status === 'Izin Penting' ? 'badge-info' : 'badge-danger';
-          badge = `<span class="badge ${bCls}">${r.status}</span>`;
+          if (r.status === 'Hadir') h++;
+          else if (r.status === 'Sakit') sCnt++;
+          else if (r.status === 'Izin Penting') iCnt++;
+          else if (r.status === 'Alpa') aCnt++;
         }
+      });
+
+      document.getElementById('wsQuickTableBody').innerHTML = students.map((st, idx) => {
+        const r = attMap[st.id];
+        const bCls = !r ? '' : r.status === 'Hadir' ? 'badge-success' : r.status === 'Sakit' ? 'badge-info' : r.status === 'Izin Penting' ? 'badge-warning' : 'badge-danger';
+        const badge = r ? `<span class="badge ${bCls}">${r.status} (${r.time})</span>` : `<span class="badge">Belum</span>`;
         return `
           <tr>
             <td>${idx + 1}</td>
-            <td><strong>${s.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.kelas} • ${s.id}</div></td>
+            <td><strong>${st.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${st.id}</div></td>
             <td>${badge}</td>
             <td>
-              <div style="display:flex; gap:3px;">
-                <button type="button" class="btn btn-success btn-xs" onclick="recordWsAttendance('${s.id}','Hadir')">H</button>
-                <button type="button" class="btn btn-info btn-xs" onclick="recordWsAttendance('${s.id}','Sakit')">S</button>
-                <button type="button" class="btn btn-warning btn-xs" onclick="recordWsAttendance('${s.id}','Izin Penting')">I</button>
-                <button type="button" class="btn btn-danger btn-xs" onclick="recordWsAttendance('${s.id}','Alpa')">A</button>
+              <div style="display:flex; gap:3px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-success btn-xs" onclick="setWsStudentAttendance('${st.id}','Hadir')">H</button>
+                <button type="button" class="btn btn-info btn-xs" onclick="setWsStudentAttendance('${st.id}','Sakit')">S</button>
+                <button type="button" class="btn btn-warning btn-xs" onclick="setWsStudentAttendance('${st.id}','Izin Penting')">I</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="setWsStudentAttendance('${st.id}','Alpa')">A</button>
               </div>
             </td>
           </tr>
         `;
       }).join('');
 
+      document.getElementById('wsStatsGrid').innerHTML = `
+        <div class="stat-card"><div class="stat-label">Total Siswa</div><div class="stat-value">${students.length}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--success);">Hadir</div><div class="stat-value" style="color:var(--success);">${h}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--info);">Sakit / Izin</div><div class="stat-value" style="color:var(--info);">${sCnt + iCnt}</div></div>
+        <div class="stat-card"><div class="stat-label" style="color:var(--danger);">Alpa</div><div class="stat-value" style="color:var(--danger);">${aCnt}</div></div>
+      `;
+
+      document.getElementById('rekapStudentTableBody').innerHTML = students.map((st, idx) => {
+        const r = attMap[st.id];
+        const badge = r ? `<span class="badge ${r.status === 'Hadir' ? 'badge-success' : 'badge-warning'}">${r.status}</span>` : `<span class="badge">Belum</span>`;
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td class="mono">${st.id}<div style="font-size:0.7rem; color:var(--text-muted);">${st.nisn || '-'}</div></td>
+            <td><strong>${st.name}</strong></td>
+            <td>${isEkskulRoom(room) ? `${st.kelas} (Sesi ${st.sesi})` : st.kelas}</td>
+            <td>${badge}</td>
+            <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteRoomStudent('${st.id}')">🗑️</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      renderWsIzinList();
       if (!document.getElementById('wsTabSholat').classList.contains('hidden')) renderWsSholatTable();
-      if (!document.getElementById('wsTabRekap').classList.contains('hidden')) renderRekapAndStudents();
       if (!document.getElementById('wsTabKartu').classList.contains('hidden')) renderQrCards();
     }
 
-    /* Absen Sholat oleh Guru Agama / Admin */
-    function recordSholatForMasterStudent(cls, masterStudentId, sholatType, status, sourceLabel) {
-      const dateStr = document.getElementById('wsDateInput')?.value || document.getElementById('guruWaliDateInput')?.value || getTodayISO();
+    function renderWsIzinList() {
+      const pending = appData.izinRequests.filter(x => x.status === 'Menunggu').length;
+      document.getElementById('wsPendingIzinBadge').textContent = `${pending} Menunggu`;
+
+      document.getElementById('wsIzinTableBody').innerHTML = appData.izinRequests.length ? appData.izinRequests.map(item => `
+        <tr>
+          <td>${item.date}</td>
+          <td><strong>${item.studentName}</strong><div style="font-size:0.74rem; color:var(--text-muted);">Kelas ${CLASS_LABELS[item.cls] || item.cls}</div></td>
+          <td><span class="badge ${item.type === 'Sakit' ? 'badge-info' : 'badge-warning'}">${item.type}</span> — ${item.reason}</td>
+          <td><button type="button" class="btn btn-outline btn-xs" onclick="openIzinPhotoModal('${item.id}')">🖼️ Lihat Foto</button></td>
+          <td>
+            <div style="display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
+              <span class="badge ${item.status === 'Disetujui' ? 'badge-success' : item.status === 'Ditolak' ? 'badge-danger' : 'badge-warning'}">${item.status}</span>
+              <button type="button" class="btn btn-success btn-xs" onclick="verifyIzinRequest('${item.id}','Disetujui')">✓ Setujui</button>
+              <button type="button" class="btn btn-danger btn-xs" onclick="verifyIzinRequest('${item.id}','Ditolak')">✕ Tolak</button>
+            </div>
+          </td>
+        </tr>
+      `).join('') : `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Belum ada pengajuan izin siswa.</td></tr>`;
+    }
+
+    function openIzinPhotoModal(izinId) {
+      const item = appData.izinRequests.find(x => x.id === izinId);
+      if (!item) return;
+      document.getElementById('photoPreviewTitle').textContent = `📸 Bukti ${item.type} — ${item.studentName}`;
+      document.getElementById('photoPreviewCaption').textContent = `Kelas ${CLASS_LABELS[item.cls] || item.cls} • Tanggal ${item.date} • ${item.reason}`;
+      document.getElementById('photoPreviewImg').src = item.photo;
+      openModal('photoPreviewModal');
+    }
+
+    function verifyIzinRequest(izinId, decision) {
+      const item = appData.izinRequests.find(x => x.id === izinId);
+      if (!item) return;
+      item.status = decision;
+      if (decision === 'Disetujui') {
+        const room = getActiveWsRoom();
+        syncClassFromMasterSilently(room.id, item.cls);
+        const match = (appData.roomStudents[room.id] || []).find(s => normalizeClassCode(s.kelas) === item.cls && s.name === item.studentName);
+        if (match) {
+          if (!appData.roomAttendance[room.id]) appData.roomAttendance[room.id] = {};
+          if (!appData.roomAttendance[room.id][item.date]) appData.roomAttendance[room.id][item.date] = {};
+          appData.roomAttendance[room.id][item.date][match.id] = { status: item.type, time: 'Izin Disetujui' };
+        }
+      }
+      saveAppData();
+      refreshWorkspaceUI();
+      showToast('success', `Izin ${decision}`, `${item.studentName} (${item.type})`);
+    }
+
+    /* ABSEN SHOLAT DI WORKSPACE GURU AGAMA / ADMIN */
+    function setWsSholatStatus(cls, stId, status) {
+      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
+      const sType = document.getElementById('wsSholatType').value || 'Dzuhur';
       if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
       if (!appData.sholatAttendance[dateStr][cls]) appData.sholatAttendance[dateStr][cls] = {};
-      if (!appData.sholatAttendance[dateStr][cls][masterStudentId]) appData.sholatAttendance[dateStr][cls][masterStudentId] = {};
+      if (!appData.sholatAttendance[dateStr][cls][stId]) appData.sholatAttendance[dateStr][cls][stId] = {};
       const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      appData.sholatAttendance[dateStr][cls][masterStudentId][sholatType] = { status, time, by: sourceLabel };
+      appData.sholatAttendance[dateStr][cls][stId][sType] = { status, time, by: 'Guru Agama' };
       saveAppData();
+      renderWsSholatTable();
     }
 
-    function resolveMasterStudent(studentObj) {
-      const cls = normalizeClassCode(studentObj.kelas) || 'VIIA';
-      const list = appData.masterStudents[cls] || [];
-      const found = list.find(m => m.nisn === studentObj.nisn || m.name === studentObj.name) || list[0];
-      return { cls, masterId: found ? found.id : studentObj.id };
-    }
-
-    function processWsSholatScan(query) {
-      const q = String(query || '').trim().toUpperCase();
-      const students = getFilteredWsStudents();
-      let found = students.find(s => s.id.toUpperCase() === q || (s.nisn && s.nisn.toUpperCase() === q) || s.name.toUpperCase().includes(q));
+    function processWsSholatScan(code) {
+      const found = findStudentAcrossAllClasses(code);
       if (!found) {
-        const cross = findStudentAcrossAllClasses(q);
-        if (cross) {
-          const room = appData.rooms.find(r => r.id === currentSession.roomId);
-          if (room && !isEkskulRoom(room)) {
-            document.getElementById('wsClassFilter').value = cross.cls;
-            ensureRoomClassPopulated(room.id, cross.cls);
-            refreshWorkspaceUI();
-          }
-          const sholatType = document.getElementById('wsSholatType').value;
-          recordSholatForMasterStudent(cross.cls, cross.student.id, sholatType, 'Jamaah', 'Guru Agama');
-          renderWsSholatTable();
-          showToast('success', `Sholat ${sholatType}: ${cross.student.name}`, `Kelas ${CLASS_LABELS[cross.cls]} • Status: Jamaah`);
-          return;
-        }
-        showToast('error', 'Siswa Tidak Ditemukan', `"${q}" tidak terdaftar.`);
+        showToast('error', 'Siswa Tidak Ditemukan', `"${code}" tidak terdaftar.`);
         return;
       }
-      const sholatType = document.getElementById('wsSholatType').value;
-      const m = resolveMasterStudent(found);
-      recordSholatForMasterStudent(m.cls, m.masterId, sholatType, 'Jamaah', 'Guru Agama');
-      renderWsSholatTable();
-      showToast('success', `Sholat ${sholatType}: ${found.name}`, 'Status: Jamaah');
+      const clsSel = document.getElementById('wsClassFilter');
+      if (ALL_CLASSES.includes(found.cls)) clsSel.value = found.cls;
+      setWsSholatStatus(found.cls, found.student.id, 'Jamaah');
+      const sType = document.getElementById('wsSholatType').value || 'Dzuhur';
+      showToast('success', `Sholat ${sType}: ${found.student.name}`, `Kelas ${CLASS_LABELS[found.cls]}`);
     }
 
     function handleWsSholatManualScan(e) {
@@ -2338,41 +2378,24 @@
       inp.value = '';
     }
 
-    function setWsSholatStatus(studentId, status) {
-      const students = getFilteredWsStudents();
-      const st = students.find(s => s.id === studentId);
-      if (!st) return;
-      const sholatType = document.getElementById('wsSholatType').value;
-      const m = resolveMasterStudent(st);
-      recordSholatForMasterStudent(m.cls, m.masterId, sholatType, status, 'Guru Agama');
-      renderWsSholatTable();
-    }
-
     function markAllWsSholatJamaah() {
-      const students = getFilteredWsStudents();
-      const sholatType = document.getElementById('wsSholatType').value;
-      students.forEach(st => {
-        const m = resolveMasterStudent(st);
-        recordSholatForMasterStudent(m.cls, m.masterId, sholatType, 'Jamaah', 'Guru Agama');
-      });
-      renderWsSholatTable();
-      showToast('success', `Semua Jamaah (${sholatType})`, `${students.length} siswa tercatat.`);
+      const cls = normalizeClassCode(document.getElementById('wsClassFilter').value) || 'VIIA';
+      const students = appData.masterStudents[cls] || [];
+      students.forEach(s => setWsSholatStatus(cls, s.id, 'Jamaah'));
+      showToast('success', 'Jamaah Semua', `${students.length} siswa kelas ${CLASS_LABELS[cls]}`);
     }
 
     function renderWsSholatTable() {
+      const cls = normalizeClassCode(document.getElementById('wsClassFilter').value) || 'VIIA';
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
-      const sholatType = document.getElementById('wsSholatType').value;
-      const students = getFilteredWsStudents();
-      const tbody = document.getElementById('wsSholatTableBody');
+      const sType = document.getElementById('wsSholatType').value || 'Dzuhur';
+      const students = appData.masterStudents[cls] || [];
+      const clsMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
 
-      tbody.innerHTML = students.map((s, idx) => {
-        const m = resolveMasterStudent(s);
-        const rec = appData.sholatAttendance?.[dateStr]?.[m.cls]?.[m.masterId]?.[sholatType];
-        let badge = `<span class="badge">Belum</span>`;
-        if (rec) {
-          const bCls = rec.status === 'Jamaah' ? 'badge-success' : rec.status === 'Udzur' ? 'badge-purple' : 'badge-danger';
-          badge = `<span class="badge ${bCls}">${rec.status} (${rec.time})</span>`;
-        }
+      document.getElementById('wsSholatTableBody').innerHTML = students.map((s, idx) => {
+        const rec = clsMap[s.id]?.[sType];
+        const bCls = !rec ? '' : rec.status === 'Jamaah' ? 'badge-success' : rec.status === 'Udzur' ? 'badge-purple' : 'badge-danger';
+        const badge = rec ? `<span class="badge ${bCls}">${rec.status} (${rec.time})</span>` : `<span class="badge">Belum</span>`;
         return `
           <tr>
             <td>${idx + 1}</td>
@@ -2380,9 +2403,9 @@
             <td>${badge}</td>
             <td>
               <div style="display:flex; gap:4px;">
-                <button type="button" class="btn btn-success btn-xs" onclick="setWsSholatStatus('${s.id}','Jamaah')">Jamaah</button>
-                <button type="button" class="btn btn-purple btn-xs" onclick="setWsSholatStatus('${s.id}','Udzur')">Udzur</button>
-                <button type="button" class="btn btn-danger btn-xs" onclick="setWsSholatStatus('${s.id}','Tidak')">Tidak</button>
+                <button type="button" class="btn btn-success btn-xs" onclick="setWsSholatStatus('${cls}','${s.id}','Jamaah')">Jamaah</button>
+                <button type="button" class="btn btn-purple btn-xs" onclick="setWsSholatStatus('${cls}','${s.id}','Udzur')">Udzur</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="setWsSholatStatus('${cls}','${s.id}','Tidak')">Tidak</button>
               </div>
             </td>
           </tr>
@@ -2391,41 +2414,36 @@
     }
 
     function exportWsSholatCSV() {
+      const cls = normalizeClassCode(document.getElementById('wsClassFilter').value) || 'VIIA';
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
-      const sholatType = document.getElementById('wsSholatType').value;
-      const students = getFilteredWsStudents();
-      const rows = [['No','Kode QR','Nama Siswa','Kelas','Tanggal','Sholat','Status']];
+      const sType = document.getElementById('wsSholatType').value || 'Dzuhur';
+      const students = appData.masterStudents[cls] || [];
+      const clsMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+      const rows = [['No', 'NISN', 'Nama Siswa', 'Kelas', 'Tanggal', 'Sholat', 'Status']];
       students.forEach((s, i) => {
-        const m = resolveMasterStudent(s);
-        const rec = appData.sholatAttendance?.[dateStr]?.[m.cls]?.[m.masterId]?.[sholatType];
-        rows.push([i + 1, s.id, `"${s.name}"`, s.kelas, dateStr, sholatType, rec ? rec.status : 'Belum']);
+        rows.push([i + 1, s.nisn || s.id, `"${s.name}"`, cls, dateStr, sType, clsMap[s.id]?.[sType]?.status || 'Belum']);
       });
-      downloadCsvFile(rows, `Absen_Sholat_${sholatType}_${dateStr}.csv`);
+      downloadCsvFile(rows, `Absen_Sholat_${sType}_${cls}_${dateStr}.csv`);
     }
 
-    /* Rekap Sholat Lintas Kelas (Guru Agama & Admin) */
     function renderAgamaSholatRekap() {
-      const sel = document.getElementById('agamaSholatClassSelect');
-      if (!sel.options.length) {
-        sel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
-      }
-      const cls = sel.value || 'VIIA';
+      const cls = document.getElementById('agamaSholatClassSelect').value || 'VIIA';
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
-      const list = appData.masterStudents[cls] || [];
-      const clsSholat = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+      const students = appData.masterStudents[cls] || [];
+      const clsMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
 
-      document.getElementById('agamaSholatTableBody').innerHTML = list.map((s, i) => {
-        const dz = clsSholat[s.id]?.Dzuhur;
-        const dh = clsSholat[s.id]?.Dhuha;
-        const dzBadge = dz ? `<span class="badge ${dz.status === 'Jamaah' ? 'badge-success' : dz.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dz.status} (${dz.by || ''})</span>` : `<span class="badge">-</span>`;
-        const dhBadge = dh ? `<span class="badge ${dh.status === 'Jamaah' ? 'badge-success' : dh.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dh.status}</span>` : `<span class="badge">-</span>`;
+      document.getElementById('agamaSholatTableBody').innerHTML = students.map((s, idx) => {
+        const dz = clsMap[s.id]?.Dzuhur;
+        const dh = clsMap[s.id]?.Dhuha;
+        const bDz = dz ? `<span class="badge ${dz.status === 'Jamaah' ? 'badge-success' : dz.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dz.status} (${dz.time})</span>` : `<span class="badge">Belum</span>`;
+        const bDh = dh ? `<span class="badge ${dh.status === 'Jamaah' ? 'badge-success' : dh.status === 'Udzur' ? 'badge-purple' : 'badge-danger'}">${dh.status} (${dh.time})</span>` : `<span class="badge">Belum</span>`;
         return `
           <tr>
-            <td>${i + 1}</td>
+            <td>${idx + 1}</td>
             <td class="mono">${s.nisn || s.id}</td>
             <td><strong>${s.name}</strong></td>
-            <td>${dzBadge}</td>
-            <td>${dhBadge}</td>
+            <td>${bDz}</td>
+            <td>${bDh}</td>
           </tr>
         `;
       }).join('');
@@ -2434,111 +2452,22 @@
     function exportAgamaSholatCSV() {
       const cls = document.getElementById('agamaSholatClassSelect').value || 'VIIA';
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
-      const list = appData.masterStudents[cls] || [];
-      const clsSholat = appData.sholatAttendance?.[dateStr]?.[cls] || {};
-      const rows = [['No','NISN','Nama Siswa','Kelas','Tanggal','Sholat Dzuhur','Sholat Dhuha']];
-      list.forEach((s, i) => {
-        rows.push([i + 1, s.nisn || s.id, `"${s.name}"`, cls, dateStr, clsSholat[s.id]?.Dzuhur?.status || 'Belum', clsSholat[s.id]?.Dhuha?.status || 'Belum']);
+      const students = appData.masterStudents[cls] || [];
+      const clsMap = appData.sholatAttendance?.[dateStr]?.[cls] || {};
+      const rows = [['No', 'NISN', 'Nama Siswa', 'Kelas', 'Tanggal', 'Sholat Dzuhur', 'Sholat Dhuha']];
+      students.forEach((s, i) => {
+        rows.push([i + 1, s.nisn || s.id, `"${s.name}"`, cls, dateStr, clsMap[s.id]?.Dzuhur?.status || 'Belum', clsMap[s.id]?.Dhuha?.status || 'Belum']);
       });
-      downloadCsvFile(rows, `Rekap_Sholat_${cls}_${dateStr}.csv`);
+      downloadCsvFile(rows, `Rekap_Sholat_Lintas_Kelas_${cls}_${dateStr}.csv`);
     }
 
-    /* Rekap Mapel, Kelola Siswa & Verifikasi Izin */
-    function renderRekapAndStudents() {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
-      const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
-      const students = getFilteredWsStudents();
-      const att = (appData.roomAttendance[room.id] && appData.roomAttendance[room.id][dateStr]) || {};
-
-      let h = 0, s = 0, iz = 0, a = 0;
-      students.forEach(st => {
-        const r = att[st.id];
-        if (!r) return;
-        if (r.status === 'Hadir') h++;
-        else if (r.status === 'Sakit') s++;
-        else if (r.status === 'Izin Penting') iz++;
-        else if (r.status === 'Alpa') a++;
-      });
-
-      document.getElementById('wsStatsGrid').innerHTML = `
-        <div class="stat-card"><div class="stat-label">Total Siswa</div><div class="stat-value">${students.length}</div></div>
-        <div class="stat-card"><div class="stat-label" style="color:var(--success);">Hadir</div><div class="stat-value" style="color:var(--success);">${h}</div></div>
-        <div class="stat-card"><div class="stat-label" style="color:var(--info);">Sakit / Izin</div><div class="stat-value" style="color:var(--info);">${s + iz}</div></div>
-        <div class="stat-card"><div class="stat-label" style="color:var(--danger);">Alpa</div><div class="stat-value" style="color:var(--danger);">${a}</div></div>
-      `;
-
-      const activeCls = isEkskulRoom(room) ? null : document.getElementById('wsClassFilter').value;
-      const izins = appData.izinRequests.filter(item => !activeCls || item.cls === activeCls);
-      const pendingCnt = izins.filter(x => x.status === 'Menunggu Verifikasi').length;
-      document.getElementById('wsPendingIzinBadge').textContent = `${pendingCnt} Menunggu`;
-
-      document.getElementById('wsIzinTableBody').innerHTML = izins.length ? izins.map(item => `
-        <tr>
-          <td>${item.date}</td>
-          <td><strong>${item.studentName}</strong><div style="font-size:0.74rem; color:var(--text-muted);">${CLASS_LABELS[item.cls] || item.cls}</div></td>
-          <td><span class="badge ${item.type === 'Sakit' ? 'badge-info' : 'badge-warning'}">${item.type}</span><div style="font-size:0.76rem; margin-top:3px;">${item.reason}</div></td>
-          <td><button type="button" class="btn btn-outline btn-xs" onclick="openIzinPhotoModal('${item.id}')">🖼️ Lihat Foto</button></td>
-          <td>
-            ${item.status === 'Menunggu Verifikasi' ? `
-              <div style="display:flex; gap:4px;">
-                <button type="button" class="btn btn-success btn-xs" onclick="verifyIzinRequest('${item.id}','Disetujui')">✅ Setujui</button>
-                <button type="button" class="btn btn-danger btn-xs" onclick="verifyIzinRequest('${item.id}','Ditolak')">✕ Tolak</button>
-              </div>
-            ` : `<span class="badge ${item.status === 'Disetujui' ? 'badge-success' : 'badge-danger'}">${item.status}</span>`}
-          </td>
-        </tr>
-      `).join('') : `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Belum ada pengajuan izin/sakit.</td></tr>`;
-
-      document.getElementById('rekapStudentTableBody').innerHTML = students.map((st, idx) => {
-        const r = att[st.id];
-        return `
-          <tr>
-            <td>${idx + 1}</td>
-            <td class="mono"><strong>${st.id}</strong><div style="font-size:0.72rem; color:var(--text-muted);">NISN: ${st.nisn || '-'}</div></td>
-            <td><strong>${st.name}</strong></td>
-            <td>${st.kelas} (Sesi ${st.sesi || 1})</td>
-            <td>${r ? `<span class="badge badge-teal">${r.status} (${r.time})</span>` : `<span class="badge">Belum Absen</span>`}</td>
-            <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteRoomStudent('${st.id}')">Hapus</button></td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    function verifyIzinRequest(izinId, decision) {
-      const item = appData.izinRequests.find(x => x.id === izinId);
-      if (!item) return;
-      item.status = decision;
-      if (decision === 'Disetujui') {
-        const room = appData.rooms.find(r => r.id === currentSession.roomId);
-        const list = appData.roomStudents[room.id] || [];
-        const match = list.find(s => normalizeClassCode(s.kelas) === item.cls && s.name === item.studentName);
-        if (match) {
-          if (!appData.roomAttendance[room.id]) appData.roomAttendance[room.id] = {};
-          if (!appData.roomAttendance[room.id][item.date]) appData.roomAttendance[room.id][item.date] = {};
-          appData.roomAttendance[room.id][item.date][match.id] = { status: item.type, time: 'Terverifikasi', note: item.reason };
-        }
-      }
-      saveAppData();
-      renderRekapAndStudents();
-      showToast('success', `Pengajuan Izin ${decision}`, item.studentName);
-    }
-
-    function openIzinPhotoModal(izinId) {
-      const item = appData.izinRequests.find(x => x.id === izinId);
-      if (!item) return;
-      document.getElementById('photoPreviewTitle').textContent = `📸 Bukti ${item.type} — ${item.studentName}`;
-      document.getElementById('photoPreviewCaption').textContent = `Kelas ${CLASS_LABELS[item.cls] || item.cls} • Tanggal ${item.date} • Alasan: ${item.reason}`;
-      document.getElementById('photoPreviewImg').src = item.photo;
-      openModal('photoPreviewModal');
-    }
-
+    /* KELOLA SISWA RUANG & KARTU QR ID */
     function openAddStudentModal() {
       document.getElementById('addStudentTargetMode').value = 'room';
       document.getElementById('addStudentModalTitle').textContent = '+ Tambah Siswa ke Ruang Ini';
-      document.getElementById('newStudentName').value = '';
-      document.getElementById('newStudentNisn').value = '';
-      document.getElementById('newStudentSesiGroup').classList.remove('hidden');
-      const curCls = document.getElementById('wsClassFilter').value;
+      const room = getActiveWsRoom();
+      document.getElementById('newStudentSesiGroup').classList.toggle('hidden', !isEkskulRoom(room));
+      const curCls = normalizeClassCode(document.getElementById('wsClassFilter').value);
       if (ALL_CLASSES.includes(curCls)) document.getElementById('newStudentClass').value = curCls;
       openModal('addStudentModal');
     }
@@ -2546,10 +2475,9 @@
     function openAddMasterStudentModal() {
       document.getElementById('addStudentTargetMode').value = 'master';
       document.getElementById('addStudentModalTitle').textContent = '+ Tambah Siswa ke Bank Kelas Induk';
-      document.getElementById('newStudentName').value = '';
-      document.getElementById('newStudentNisn').value = '';
       document.getElementById('newStudentSesiGroup').classList.add('hidden');
-      document.getElementById('newStudentClass').value = document.getElementById('adminMasterClassSelect').value;
+      const curCls = document.getElementById('adminMasterClassSelect').value;
+      if (ALL_CLASSES.includes(curCls)) document.getElementById('newStudentClass').value = curCls;
       openModal('addStudentModal');
     }
 
@@ -2558,115 +2486,82 @@
       const mode = document.getElementById('addStudentTargetMode').value;
       const name = document.getElementById('newStudentName').value.trim().toUpperCase();
       const cls = document.getElementById('newStudentClass').value;
-      const nisn = document.getElementById('newStudentNisn').value.trim() || `01189${Date.now().toString().slice(-5)}`;
+      const nisn = document.getElementById('newStudentNisn').value.trim() || `01189${Math.floor(10000 + Math.random() * 89999)}`;
       const sesi = parseInt(document.getElementById('newStudentSesi').value, 10) || 1;
+      if (!name) return;
 
       if (mode === 'master') {
         if (!appData.masterStudents[cls]) appData.masterStudents[cls] = [];
-        const idx = appData.masterStudents[cls].length + 1;
-        appData.masterStudents[cls].push({ id: `${cls}-0${String(idx).padStart(2,'0')}`, nisn, name, kelas: cls, sesi });
+        const num = String(appData.masterStudents[cls].length + 1).padStart(2, '0');
+        appData.masterStudents[cls].push({ id: `${cls}-0${num}`, nisn, name, kelas: cls, sesi: 1 });
         saveAppData();
-        closeModal('addStudentModal');
         renderAdminMasterClassTable();
-        showToast('success', 'Siswa Induk Ditambahkan', `${name} (${CLASS_LABELS[cls]})`);
+        showToast('success', 'Siswa Induk Ditambahkan', `${name} (${cls})`);
       } else {
-        const room = appData.rooms.find(r => r.id === currentSession.roomId);
+        const room = getActiveWsRoom();
         if (!appData.roomStudents[room.id]) appData.roomStudents[room.id] = [];
         const num = String(appData.roomStudents[room.id].length + 1).padStart(2, '0');
-        const code = isEkskulRoom(room) ? `${room.prefix}${sesi}-${num}` : `${room.prefix}-${cls}-${num}`;
-        appData.roomStudents[room.id].push({ id: code, nisn, name, kelas: cls, sesi });
+        const id = isEkskulRoom(room) ? `${room.prefix}${sesi}-${num}` : `${room.prefix}-${cls}-${num}`;
+        appData.roomStudents[room.id].push({ id, nisn, name, kelas: cls, sesi });
         saveAppData();
-        closeModal('addStudentModal');
         refreshWorkspaceUI();
-        showToast('success', 'Siswa Ditambahkan', `${name} (${code})`);
+        showToast('success', 'Siswa Ditambahkan', `${name} (${id})`);
       }
+      e.target.reset();
+      closeModal('addStudentModal');
     }
 
     function deleteRoomStudent(stId) {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const room = getActiveWsRoom();
       appData.roomStudents[room.id] = (appData.roomStudents[room.id] || []).filter(s => s.id !== stId);
       saveAppData();
       refreshWorkspaceUI();
-      showToast('success', 'Siswa Dihapus', stId);
     }
 
     function downloadImportTemplateCSV() {
-      const rows = [
-        ['Nama Lengkap', 'Kelas', 'NISN', 'Sesi'],
-        ['BUDI SANTOSO', 'VIIA', '0118910099', '1'],
-        ['SITI AMINAH', 'VIIA', '0118910100', '1']
-      ];
-      downloadCsvFile(rows, 'Template_Import_Siswa_SMPN1Tempuran.csv');
+      const cls = document.getElementById('wsClassFilter').value || 'VIIA';
+      downloadCsvFile([['Nama Lengkap', 'Kelas', 'NISN'], ['BUDI SANTOSO', cls, '0118910099']], `Template_Siswa_${cls}.csv`);
     }
 
     function importRoomStudentsCSV(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const room = getActiveWsRoom();
+      const defaultCls = normalizeClassCode(document.getElementById('wsClassFilter').value) || 'VIIA';
       const reader = new FileReader();
       reader.onload = function(ev) {
         const lines = (ev.target.result || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        let added = 0;
         if (!appData.roomStudents[room.id]) appData.roomStudents[room.id] = [];
+        let added = 0;
         lines.forEach((line, idx) => {
           const p = line.split(/[,;\t]+/).map(x => x.replace(/^["']|["']$/g, '').trim());
-          if (idx === 0 && p[0].toLowerCase().includes('nama')) return;
-          if (!p[0]) return;
-          const name = p[0].toUpperCase();
-          const cls = normalizeClassCode(p[1]) || 'VIIA';
-          const nisn = p[2] || `01189${String(10000 + added)}`;
-          const sesi = parseInt(p[3], 10) === 2 ? 2 : 1;
+          if (idx === 0 && (p[0].toLowerCase().includes('nama') || p[0].toLowerCase() === 'no')) return;
+          const name = (p[0] || '').toUpperCase();
+          if (!name) return;
+          const cls = normalizeClassCode(p[1]) || defaultCls;
+          const nisn = p[2] || '';
           const num = String(appData.roomStudents[room.id].length + 1).padStart(2, '0');
-          const code = isEkskulRoom(room) ? `${room.prefix}${sesi}-${num}` : `${room.prefix}-${cls}-${num}`;
-          appData.roomStudents[room.id].push({ id: code, nisn, name, kelas: cls, sesi });
+          appData.roomStudents[room.id].push({ id: `${room.prefix}-${cls}-${num}`, nisn, name, kelas: cls, sesi: 1 });
           added++;
         });
         saveAppData();
         refreshWorkspaceUI();
-        showToast('success', 'Import CSV Berhasil', `${added} siswa ditambahkan.`);
+        showToast('success', 'Import CSV Berhasil', `${added} siswa ditambahkan ke ${room.name}.`);
       };
       reader.readAsText(file);
       e.target.value = '';
     }
 
     function exportRoomAttendanceCSV() {
-      const room = appData.rooms.find(r => r.id === currentSession.roomId);
+      const room = getActiveWsRoom();
       const dateStr = document.getElementById('wsDateInput').value || getTodayISO();
       const students = getFilteredWsStudents();
-      const att = (appData.roomAttendance[room.id] && appData.roomAttendance[room.id][dateStr]) || {};
-      const rows = [['No','Kode QR','NISN','Nama Siswa','Kelas','Tanggal','Status','Waktu']];
+      const attMap = appData.roomAttendance?.[room.id]?.[dateStr] || {};
+      const rows = [['No', 'Kode QR', 'NISN', 'Nama Siswa', 'Kelas', 'Tanggal', 'Status']];
       students.forEach((s, i) => {
-        const r = att[s.id];
-        rows.push([i + 1, s.id, s.nisn || '-', `"${s.name}"`, s.kelas, dateStr, r ? r.status : 'Belum Absen', r ? r.time : '-']);
+        rows.push([i + 1, s.id, s.nisn || '-', `"${s.name}"`, s.kelas, dateStr, attMap[s.id]?.status || 'Belum']);
       });
       downloadCsvFile(rows, `Rekap_${room.prefix}_${dateStr}.csv`);
-    }
-
-    /* Kartu QR ID Resmi SMPN 1 Tempuran */
-    function renderQrCards() {
-      const students = getFilteredWsStudents();
-      const grid = document.getElementById('qrCardsGrid');
-      const logoSrc = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
-
-      grid.innerHTML = students.map(s => `
-        <div class="id-card">
-          <div class="id-card-header">
-            <img src="${logoSrc}" alt="Logo SMPN 1 Tempuran" class="id-card-logo" />
-            <div class="id-card-school">
-              <h4>SMP NEGERI 1<br/>TEMPURAN</h4>
-              <p>Kartu Absensi Resmi dan Wajib Dibawa</p>
-            </div>
-          </div>
-          <div class="id-card-qr">${createQrSvg(s.id)}</div>
-          <div class="id-card-meta">
-            <div><span class="lbl">Nama</span><span>: </span><span class="val">${s.name.replace(/\s*\([IVX]+[A-G]\)$/, '')}</span></div>
-            <div><span class="lbl">Kelas</span><span>: </span><span class="val">${s.kelas}</span></div>
-            <div><span class="lbl">NISN</span><span>: </span><span class="val mono">${s.nisn || '-'}</span></div>
-            <div><span class="lbl">KD</span><span>: </span><span class="val mono">${s.id}</span></div>
-          </div>
-          <div class="id-card-footer">Kartu Ini Wajib Dijaga, Apabila Hilang Segera Lapor Wali Kelas</div>
-        </div>
-      `).join('');
     }
 
     function handleSchoolLogoUpload(e) {
@@ -2677,10 +2572,33 @@
         appData.schoolLogo = ev.target.result;
         saveAppData();
         renderQrCards();
-        showToast('success', 'Logo Sekolah Diperbarui', 'Tampilan kartu ID langsung diperbarui.');
+        showToast('success', 'Logo Sekolah Diperbarui', 'Kartu QR kini menggunakan logo baru.');
       };
       reader.readAsDataURL(file);
       e.target.value = '';
+    }
+
+    function renderQrCards() {
+      const students = getFilteredWsStudents();
+      const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
+      document.getElementById('qrCardsGrid').innerHTML = students.map(s => `
+        <div class="id-card">
+          <div class="id-card-header">
+            <img src="${logo}" class="id-card-logo" alt="Logo SMPN 1 Tempuran" />
+            <div class="id-card-school">
+              <h4>SMP NEGERI 1 TEMPURAN</h4>
+              <p>Kartu Absensi Resmi dan Wajib Dibawa</p>
+            </div>
+          </div>
+          <div class="id-card-qr">${createQrSvg(s.id)}</div>
+          <div class="id-card-meta">
+            <div><span class="lbl">Nama</span><span class="val">: ${s.name}</span></div>
+            <div><span class="lbl">Kelas</span><span class="val">: ${s.kelas}</span></div>
+            <div><span class="lbl">NISN</span><span class="val">: ${s.nisn || s.id}</span></div>
+          </div>
+          <div class="id-card-footer">Kode Kartu: ${s.id} • Scan saat Hadir / Sholat</div>
+        </div>
+      `).join('');
     }
 
     /* =====================================================================
@@ -2691,44 +2609,47 @@
       const type = document.getElementById('adminNewRoomType').value;
       const name = document.getElementById('adminNewRoomName').value.trim();
       const teacher = document.getElementById('adminNewRoomTeacher').value.trim();
-      const prefix = document.getElementById('adminNewRoomPrefix').value.trim().toUpperCase();
+      const prefix = document.getElementById('adminNewRoomPrefix').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
       const pin = document.getElementById('adminNewRoomPin').value.trim();
       if (!name || !teacher || !prefix || !pin) return;
 
-      const newId = `room_${prefix.toLowerCase()}_${Date.now().toString(36)}`;
-      appData.rooms.push({ id: newId, type, name, teacher, prefix, pin });
+      appData.rooms.push({
+        id: `room_${prefix.toLowerCase()}_${Date.now().toString(36)}`,
+        type,
+        name,
+        teacher,
+        prefix,
+        pin
+      });
       saveAppData();
-
-      document.getElementById('adminNewRoomName').value = '';
-      document.getElementById('adminNewRoomTeacher').value = '';
-      document.getElementById('adminNewRoomPrefix').value = '';
-
-      populateLoginRoomDropdown();
-      const switcher = document.getElementById('adminRoomSwitcher');
-      if (switcher) {
-        switcher.innerHTML = appData.rooms.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-        switcher.value = newId;
-        currentSession.roomId = newId;
-      }
+      e.target.reset();
+      document.getElementById('adminNewRoomPin').value = '1234';
       renderAdminPanel();
-      showToast('success', 'Mata Pelajaran / Ekskul Ditambahkan', `${name} (PIN: ${pin})`);
+      showToast('success', 'Ruang Baru Tersimpan', `${name} (PIN: ${pin})`);
     }
 
-    function deleteRoom(roomId) {
-      if (appData.rooms.length <= 1) return;
+    function deleteRoomById(roomId) {
       appData.rooms = appData.rooms.filter(r => r.id !== roomId);
       delete appData.roomStudents[roomId];
-      if (currentSession.roomId === roomId) currentSession.roomId = appData.rooms[0].id;
       saveAppData();
-      populateLoginRoomDropdown();
       renderAdminPanel();
-      showToast('success', 'Ruang Dihapus', roomId);
+      showToast('success', 'Ruang Dihapus', 'Mata pelajaran / ekskul telah dihapus.');
+    }
+
+    function updateRoomPin(roomId, newPin) {
+      const r = appData.rooms.find(x => x.id === roomId);
+      if (r && newPin.trim()) {
+        r.pin = newPin.trim();
+        saveAppData();
+        showToast('success', 'PIN Diperbarui', `${r.name} -> PIN baru disimpan.`);
+      }
     }
 
     function renderAdminPanel() {
       const mSel = document.getElementById('adminMasterClassSelect');
       if (!mSel.options.length) {
-        mSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
+        mSel.innerHTML = `<option value="ALL">📚 Semua Data (VIIA–IXG)</option>` +
+          ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c]}</option>`).join('');
       }
       const urlInp = document.getElementById('adminAppsScriptUrlInput');
       if (urlInp && !urlInp.value) {
@@ -2739,41 +2660,37 @@
       const tbody = document.getElementById('adminRoomsListBody');
       tbody.innerHTML = appData.rooms.map(r => `
         <tr>
-          <td><strong>${r.name}</strong></td>
-          <td><span class="badge badge-info">${r.type}</span></td>
+          <td><strong>${r.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">Prefix: ${r.prefix}</div></td>
+          <td><span class="badge badge-teal">${r.type}</span></td>
           <td>${r.teacher}</td>
-          <td class="mono">${r.pin}</td>
-          <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteRoom('${r.id}')">Hapus</button></td>
+          <td><input type="text" class="form-control mono" style="width:90px; padding:4px 8px;" value="${r.pin}" onchange="updateRoomPin('${r.id}', this.value)" /></td>
+          <td>${appData.rooms.length > 1 ? `<button type="button" class="btn btn-danger btn-xs" onclick="deleteRoomById('${r.id}')">Hapus</button>` : '-'}</td>
         </tr>
-      `).join('') + `
-        <tr>
-          <td><strong>🕌 Guru Wali (Sholat Dzuhur)</strong></td>
-          <td><span class="badge badge-purple">Akun Khusus</span></td>
-          <td>${appData.guruWaliName}</td>
-          <td class="mono">${appData.guruWaliPin}</td>
-          <td><span class="badge badge-success">Aktif</span></td>
-        </tr>
-        <tr>
-          <td><strong>👩‍🏫 Wali Kelas (VIIA–IXG)</strong></td>
-          <td><span class="badge badge-purple">21 Wali Kelas</span></td>
-          <td>Semua Wali Kelas</td>
-          <td class="mono">2026</td>
-          <td><span class="badge badge-success">Aktif</span></td>
-        </tr>
-        <tr>
-          <td><strong>🧑‍⚕️ Guru BK (Kelas VII, VIII, IX)</strong></td>
-          <td><span class="badge badge-purple">3 Jenjang BK</span></td>
-          <td>Tim BK SMPN 1 Tempuran</td>
-          <td class="mono">3030</td>
-          <td><span class="badge badge-success">Aktif</span></td>
-        </tr>
-      `;
+      `).join('');
     }
 
     function renderAdminMasterClassTable() {
-      const cls = document.getElementById('adminMasterClassSelect').value || 'VIIA';
+      const cls = document.getElementById('adminMasterClassSelect').value || 'ALL';
+      const tbody = document.getElementById('adminMasterClassBody');
+      if (cls === 'ALL') {
+        const rows = [];
+        ALL_CLASSES.forEach(c => {
+          (appData.masterStudents[c] || []).forEach(s => {
+            rows.push(`
+              <tr>
+                <td class="mono">${s.id}</td>
+                <td class="mono">${s.nisn}</td>
+                <td><strong>${s.name}</strong> <span class="badge badge-teal" style="margin-left:4px;">${c}</span></td>
+                <td><button type="button" class="btn btn-danger btn-xs" onclick="deleteMasterStudent('${c}','${s.id}')">✕</button></td>
+              </tr>
+            `);
+          });
+        });
+        tbody.innerHTML = rows.join('');
+        return;
+      }
       const list = appData.masterStudents[cls] || [];
-      document.getElementById('adminMasterClassBody').innerHTML = list.map(s => `
+      tbody.innerHTML = list.map(s => `
         <tr>
           <td class="mono">${s.id}</td>
           <td class="mono">${s.nisn}</td>
@@ -2790,7 +2707,18 @@
     }
 
     function downloadMasterTemplateCSV() {
-      const cls = document.getElementById('adminMasterClassSelect')?.value || 'VIIA';
+      const cls = document.getElementById('adminMasterClassSelect')?.value || 'ALL';
+      if (cls === 'ALL') {
+        const rows = [
+          ['Nama Lengkap', 'Kelas', 'NISN'],
+          ['BUDI SANTOSO', 'VIIA', '0118910099'],
+          ['SITI AMINAH', 'VIIB', '0118910100'],
+          ['AHMAD FAUZI', 'VIIIA', '0118930101'],
+          ['DEWI LESTARI', 'IXA', '0118920102']
+        ];
+        downloadCsvFile(rows, 'Template_Import_Semua_Kelas_VIIA_IXG.csv');
+        return;
+      }
       const rows = [
         ['Nama Lengkap', 'Kelas', 'NISN'],
         ['BUDI SANTOSO', cls, '0118910099'],
@@ -2802,44 +2730,75 @@
     function importMasterStudentsCSV(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const defaultCls = document.getElementById('adminMasterClassSelect')?.value || 'VIIA';
+      const selectedVal = document.getElementById('adminMasterClassSelect')?.value || 'ALL';
+      const defaultCls = ALL_CLASSES.includes(selectedVal) ? selectedVal : 'VIIA';
       const reader = new FileReader();
       reader.onload = function(ev) {
         const lines = (ev.target.result || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         let added = 0;
+        let updated = 0;
         lines.forEach((line, idx) => {
           const p = line.split(/[,;\t]+/).map(x => x.replace(/^["']|["']$/g, '').trim());
-          if (idx === 0 && p[0].toLowerCase().includes('nama')) return;
-          if (!p[0]) return;
-          const name = p[0].toUpperCase();
-          const normCls = normalizeClassCode(p[1]);
+          if (idx === 0 && (p[0].toLowerCase().includes('nama') || p[0].toLowerCase() === 'no')) return;
+
+          let name = '';
+          let rawKelas = '';
+          let nisn = '';
+
+          if (p.length >= 4 && /^\d+$/.test(p[0])) {
+            nisn = p[2] || '';
+            name = (p[3] || '').toUpperCase();
+            rawKelas = p[4] || '';
+          } else {
+            name = (p[0] || '').toUpperCase();
+            rawKelas = p[1] || '';
+            nisn = p[2] || '';
+          }
+
+          if (!name) return;
+          const normCls = normalizeClassCode(rawKelas);
           const targetCls = ALL_CLASSES.includes(normCls) ? normCls : defaultCls;
-          const nisn = p[2] || `01189${String(10000 + Math.floor(Math.random() * 89999))}`;
+          const finalNisn = nisn || `01189${String(10000 + Math.floor(Math.random() * 89999))}`;
 
           if (!appData.masterStudents[targetCls]) appData.masterStudents[targetCls] = [];
-          const exists = appData.masterStudents[targetCls].some(s => s.name === name);
-          if (!exists) {
+          const existing = appData.masterStudents[targetCls].find(s => s.name === name);
+          if (!existing) {
             const num = String(appData.masterStudents[targetCls].length + 1).padStart(2, '0');
             appData.masterStudents[targetCls].push({
               id: `${targetCls}-0${num}`,
-              nisn,
+              nisn: finalNisn,
               name,
               kelas: targetCls,
               sesi: 1
             });
             added++;
+          } else if (nisn && existing.nisn !== nisn) {
+            existing.nisn = nisn;
+            updated++;
           }
         });
         saveAppData();
+        pushStateToAppsScript(false);
         renderAdminMasterClassTable();
-        showToast('success', 'Import Siswa Induk Selesai', `${added} siswa baru ditambahkan ke Bank Kelas Induk.`);
+        showToast('success', 'Import Siswa Induk Berhasil', `${added} siswa ditambahkan${updated ? `, ${updated} NISN diperbarui` : ''} & tersimpan ke Cloud.`);
       };
       reader.readAsText(file);
       e.target.value = '';
     }
 
     function exportMasterStudentsCSV() {
-      const cls = document.getElementById('adminMasterClassSelect')?.value || 'VIIA';
+      const cls = document.getElementById('adminMasterClassSelect')?.value || 'ALL';
+      if (cls === 'ALL') {
+        const rows = [['No', 'Kode Induk', 'NISN', 'Nama Lengkap', 'Kelas']];
+        let no = 1;
+        ALL_CLASSES.forEach(c => {
+          (appData.masterStudents[c] || []).forEach(s => {
+            rows.push([no++, s.id, s.nisn || '-', `"${s.name}"`, c]);
+          });
+        });
+        downloadCsvFile(rows, 'Data_Semua_Siswa_Induk_VIIA_IXG.csv');
+        return;
+      }
       const list = appData.masterStudents[cls] || [];
       if (!list.length) {
         showToast('error', 'Data Kosong', `Belum ada siswa di kelas ${CLASS_LABELS[cls]}.`);
