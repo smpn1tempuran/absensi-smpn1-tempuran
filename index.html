@@ -486,12 +486,12 @@
       </div>
 
       <div class="tab-nav">
-        <button type="button" id="pubTabPagi" class="tab-btn active" onclick="switchPublicTab('pagi')">☀️ Absen Pagi (Non-Mapel)</button>
-        <button type="button" id="pubTabIzin" class="tab-btn" onclick="switchPublicTab('izin')">📸 Portal Izin / Sakit (Foto Wajah + Surat)</button>
+        <button type="button" id="pubTabPagi" class="tab-btn" onclick="switchPublicTab('pagi')">🔒 Absen Pagi (Non-Mapel)</button>
+        <button type="button" id="pubTabIzin" class="tab-btn active" onclick="switchPublicTab('izin')">📸 Portal Izin / Sakit (Foto Wajah + Surat)</button>
       </div>
 
       <!-- SUB-TAB PUBLIK A: ABSEN PAGI -->
-      <section id="publicPagiSection" class="grid-2">
+      <section id="publicPagiSection" class="grid-2 hidden">
         <div class="card">
           <div class="card-header">
             <h3>📷 Scan QR / Input Kode Absen Pagi</h3>
@@ -543,7 +543,7 @@
       </section>
 
       <!-- SUB-TAB PUBLIK B: PORTAL IZIN FOTO LANGSUNG WAJAH + SURAT -->
-      <section id="publicIzinSection" class="hidden">
+      <section id="publicIzinSection">
         <div class="card" style="max-width:660px; margin:0 auto;">
           <div class="card-header">
             <h3>📸 Form Pengajuan Sakit / Izin (Wajib Foto Wajah + Surat)</h3>
@@ -941,6 +941,20 @@
 
         <div class="card" style="margin-top:1rem;">
           <div class="card-header">
+            <h3>🔒 Pengaturan PIN Keamanan Absen Pagi (Mode Umum)</h3>
+            <span class="badge badge-warning">Proteksi Anti-Titip Absen</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            PIN ini wajib dimasukkan saat petugas piket/guru membuka tab <strong>Absen Pagi (Non-Mapel)</strong> di halaman depan agar siswa atau orang tua tidak dapat mengisi absen pagi sendiri.
+          </p>
+          <div style="display:flex; gap:0.5rem; align-items:center; max-width:380px;">
+            <input type="text" id="adminPagiPinInput" class="form-control mono" maxlength="8" placeholder="Default: 1122" />
+            <button type="button" class="btn btn-primary btn-sm" onclick="saveAdminPagiPin()">💾 Simpan PIN</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem;">
+          <div class="card-header">
             <h3>☁️ Sinkronisasi Google Sheets Cloud Real-Time (Apps Script)</h3>
             <span id="adminCloudStatusBadge" class="badge badge-success">🟢 Google Sheets Cloud Aktif</span>
           </div>
@@ -1035,7 +1049,6 @@
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
             <select id="bkClassSelector" class="form-control hidden" style="width:auto; font-weight:800;" onchange="refreshHomeroomDashboard()"></select>
             <input type="date" id="hrDateInput" class="form-control" style="width:auto;" onchange="refreshHomeroomDashboard()" />
-            <button type="button" id="btnWaliPrintCards" class="btn btn-warning btn-sm hidden" onclick="toggleWaliCardPrintSection()">🪪 Cetak Kartu QR Kelas</button>
             <button type="button" class="btn btn-success btn-sm" onclick="exportHomeroomCSV()">📥 Export Laporan CSV</button>
           </div>
         </div>
@@ -1064,20 +1077,6 @@
             <tbody id="hrMatrixTableBody"></tbody>
           </table>
         </div>
-      </div>
-
-      <div id="waliPrintCardsSection" class="card hidden" style="margin-bottom:1rem;">
-        <div class="card-header no-print">
-          <div>
-            <h3>🪪 Cetak Kartu Absensi Terpadu — Wali Kelas</h3>
-            <p style="font-size:0.78rem; color:var(--text-muted);">Satu kartu QR tunggal untuk seluruh jenis absensi (Absen Pagi, Sholat, &amp; Semua Mata Pelajaran).</p>
-          </div>
-          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-            <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Cetak Kartu / PDF</button>
-            <button type="button" class="btn btn-outline btn-sm" onclick="toggleWaliCardPrintSection(false)">✕ Tutup</button>
-          </div>
-        </div>
-        <div id="waliQrCardsGrid" class="qr-grid"></div>
       </div>
 
       <div class="card">
@@ -1120,7 +1119,7 @@
               <option value="guru_wali">🕌 Guru Wali — Khusus Absen Sholat Dzuhur (PIN: 4040)</option>
               <option value="wali_kelas">👩‍🏫 Wali Kelas VIIA–IXG (PIN: 2026)</option>
               <option value="guru_bk">🧑‍⚕️ Guru BK Jenjang VII / VIII / IX (PIN: 3030)</option>
-              <option value="admin">🛡️ Admin Sekolah</option>
+              <option value="admin">🛡️ Admin Sekolah (PIN: 9999)</option>
             </select>
           </div>
 
@@ -1211,6 +1210,29 @@
       <div class="modal-body" style="text-align:center;">
         <p id="photoPreviewCaption" style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.75rem;"></p>
         <img id="photoPreviewImg" alt="Bukti Foto Izin" style="max-width:100%; max-height:65vh; border-radius:12px; border:1px solid var(--border);" />
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PIN ABSEN PAGI -->
+  <div id="pagiPinModal" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width:400px;">
+      <div class="modal-head">
+        <h3>🔒 Verifikasi PIN Petugas Absen Pagi</h3>
+        <button type="button" class="btn btn-danger btn-xs" onclick="closeModal('pagiPinModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.85rem;">
+          Untuk mencegah siswa melakukan absen pagi sendiri dari rumah, masukkan <strong>PIN Petugas Piket / Admin</strong> terlebih dahulu.
+        </p>
+        <form onsubmit="handlePagiPinSubmit(event)">
+          <div class="form-group">
+            <label for="pagiPinVerifyInput">PIN Akses Absen Pagi *</label>
+            <input type="password" id="pagiPinVerifyInput" class="form-control mono" placeholder="Masukkan PIN..." inputmode="numeric" required />
+          </div>
+          <p id="pagiPinErrorMsg" class="hidden" style="color:var(--danger); font-size:0.8rem; font-weight:700; margin-bottom:0.75rem;"></p>
+          <button type="submit" class="btn btn-primary" style="width:100%;">🔓 Buka Absen Pagi</button>
+        </form>
       </div>
     </div>
   </div>
@@ -1322,11 +1344,11 @@
     let izinFacingMode = 'user';
     let capturedIzinDataUrl = null;
     let lastQrHit = { code: '', time: 0 };
+    let isPagiUnlocked = false;
     let lastCloudSnapshotHash = '';
     let hasUnsyncedLocalChanges = false;
     let lastLocalMutationAt = 0;
     let isSyncingFromCloud = false;
-let isPushingToCloud = false;
 
     function getAppsScriptUrl() {
       return localStorage.getItem(APPS_SCRIPT_URL_KEY) || DEFAULT_APPS_SCRIPT_URL;
@@ -1389,6 +1411,7 @@ let isPushingToCloud = false;
 
         appData = {
           adminPin: '9999',
+          pagiPin: '1122',
           guruWaliPin: '4040',
           guruWaliName: 'Guru Wali Sholat Dzuhur',
           bkPins: { VII: '3030', VIII: '3030', IX: '3030' },
@@ -1462,159 +1485,142 @@ let isPushingToCloud = false;
     }
 
     async function pushStateToAppsScript(notifyUser = false) {
-      let url = getAppsScriptUrl();
-      if (!url || !appData) return;
-      if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
-        url = url.replace(/\/$/, '') + '/absensi.json';
-      }
-      isPushingToCloud = true;
-      try {
-        const payloadObj = { ...appData };
-        delete payloadObj._isFreshDefault;
-        payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
-        const serialized = JSON.stringify(payloadObj);
+  let url = getAppsScriptUrl();
+  if (!url || !appData) return;
+  if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
+    url = url.replace(/\/$/, '') + '/absensi.json';
+  }
+  try {
+    const payloadObj = { ...appData };
+    delete payloadObj._isFreshDefault;
+    payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
+    const serialized = JSON.stringify(payloadObj);
 
-        const res = await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: serialized
-        });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: serialized
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
 
-        lastCloudSnapshotHash = serialized;
-        hasUnsyncedLocalChanges = false;
-        updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
-        if (notifyUser) {
-          showToast('success', 'Terkirim ke Cloud', 'Seluruh data absensi berhasil disimpan ke Firebase.');
-        }
-      } catch (err) {
-        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
-        if (notifyUser) {
-          showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
-        }
-      } finally {
-        isPushingToCloud = false;
+    lastCloudSnapshotHash = serialized;
+    hasUnsyncedLocalChanges = false;
+    updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+    if (notifyUser) {
+      showToast('success', 'Terkirim ke Cloud', 'Seluruh data absensi berhasil disimpan ke Firebase.');
+    }
+  } catch (err) {
+    updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
+    if (notifyUser) {
+      showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
+    }
+  }
+}
+
+async function pullStateFromAppsScript(notifyUser = false) {
+  let url = getAppsScriptUrl();
+  if (!url || isSyncingFromCloud) return;
+  if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 12000)) {
+    return;
+  }
+  if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
+    url = url.replace(/\/$/, '') + '/absensi.json';
+  }
+  isSyncingFromCloud = true;
+  try {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const incoming = await res.json();
+
+    const trimmed = JSON.stringify(incoming || {});
+    if (!incoming || !Array.isArray(incoming.rooms) || !incoming.masterStudents) {
+      updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+      if (!appData._isFreshDefault) {
+        await pushStateToAppsScript(false);
       }
+      return;
     }
 
-    async function pullStateFromAppsScript(notifyUser = false) {
-      let url = getAppsScriptUrl();
-      if (!url || isSyncingFromCloud || isPushingToCloud) return;
-      if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 15000)) {
-        return;
-      }
-      if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
-        url = url.replace(/\/$/, '') + '/absensi.json';
-      }
-      isSyncingFromCloud = true;
-      try {
-        const sep = url.includes('?') ? '&' : '?';
-        const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const incoming = await res.json();
+    updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+    const localTime = Number(appData._updatedAt || 0);
+    const remoteTime = Number(incoming._updatedAt || 0);
 
-        const trimmed = JSON.stringify(incoming || {});
-        if (!incoming || !Array.isArray(incoming.rooms) || !incoming.masterStudents) {
-          updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
-          if (!appData._isFreshDefault) {
-            await pushStateToAppsScript(false);
-          }
-          return;
-        }
-
-        updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
-        const localTime = Number(appData._updatedAt || 0);
-        const remoteTime = Number(incoming._updatedAt || 0);
-
-        if (!appData._isFreshDefault && !notifyUser && localTime > 0 && remoteTime > 0 && remoteTime < localTime) {
-          await pushStateToAppsScript(false);
-          return;
-        }
-
-        if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser || appData._isFreshDefault)) {
-          lastCloudSnapshotHash = trimmed;
-          hasUnsyncedLocalChanges = false;
-          appData = incoming;
-          delete appData._isFreshDefault;
-          localStorage.setItem(STORAGE_KEY, trimmed);
-          rerenderActiveRoleView();
-        }
-        if (notifyUser) {
-          showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Firebase Cloud sudah dimuat.');
-        }
-      } catch (err) {
-        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
-        if (notifyUser) {
-          showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan URL Firebase & Rules sudah aktif.');
-        }
-      } finally {
-        isSyncingFromCloud = false;
-      }
+    if (!appData._isFreshDefault && !notifyUser && localTime > 0 && remoteTime > 0 && remoteTime < localTime) {
+      await pushStateToAppsScript(false);
+      return;
     }
+
+    if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser || appData._isFreshDefault)) {
+      lastCloudSnapshotHash = trimmed;
+      hasUnsyncedLocalChanges = false;
+      appData = incoming;
+      delete appData._isFreshDefault;
+      localStorage.setItem(STORAGE_KEY, trimmed);
+      rerenderActiveRoleView();
+    }
+    if (notifyUser) {
+      showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Firebase Cloud sudah dimuat.');
+    }
+  } catch (err) {
+    updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
+    if (notifyUser) {
+      showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan URL Firebase & Rules sudah aktif.');
+    }
+  } finally {
+    isSyncingFromCloud = false;
+  }
+}
     /* =========================================================================
        PENCARIAN SISWA LINTAS FORMAT QR / NISN / NAMA
        ========================================================================= */
-    function cleanKey(val) {
-      return String(val || '').replace(/[\u200B-\u200D\uFEFF\r\n\t]/g, '').trim().toUpperCase();
-    }
-
-    function normalizeStudentCode(code) {
-      // Samakan VIIA-02 dan VIIA-002 serta hapus prefix mapel seperti MTK-VIIA-02 -> VIIA-002
-      let c = cleanKey(code);
-      const prefixed = c.match(/^[A-Z0-9]{2,6}-((?:IX|VIII|VII)[A-G])-(\d+)$/);
-      if (prefixed) {
-        c = `${prefixed[1]}-${prefixed[2]}`;
-      }
-      const std = c.match(/^((?:IX|VIII|VII)[A-G])-(\d+)$/);
-      if (std) {
-        return `${std[1]}-${String(parseInt(std[2], 10)).padStart(3, '0')}`;
-      }
-      return c;
-    }
-
     function findStudentAcrossSystem(rawCode, preferredClass = null) {
-      const q = cleanKey(rawCode);
-      const qNorm = normalizeStudentCode(q);
+      const q = String(rawCode || '').trim().toUpperCase();
       if (!q) return null;
-
-      const matchStudent = (s) => {
-        const sId = cleanKey(s.id);
-        const sIdNorm = normalizeStudentCode(sId);
-        const sNisn = cleanKey(s.nisn);
-        const sName = cleanKey(s.name);
-        return (
-          sId === q ||
-          sIdNorm === qNorm ||
-          (sNisn && (sNisn === q || sNisn === qNorm)) ||
-          q.endsWith('-' + sId) ||
-          (q.length >= 4 && sName.includes(q))
-        );
-      };
 
       // 1. Cek di kelas prioritas pada masterStudents
       if (preferredClass && appData.masterStudents[preferredClass]) {
-        const exact = appData.masterStudents[preferredClass].find(s => matchStudent(s));
+        const list = appData.masterStudents[preferredClass];
+        const exact = list.find(s =>
+          s.id.toUpperCase() === q ||
+          (s.nisn && s.nisn.toUpperCase() === q) ||
+          q.endsWith('-' + s.id.toUpperCase())
+        );
         if (exact) return { ...exact, kelas: preferredClass };
       }
 
-      // 2. Cek di seluruh Bank Data Kelas Induk (VIIA - IXG)
+      // 2. Cek di seluruh Bank Data Kelas Induk (termasuk kartu ber-prefix mapel seperti PAI-VIIA-01 / MTK-VIIA-01)
       for (const cls of ALL_CLASSES) {
         const list = appData.masterStudents[cls] || [];
-        const found = list.find(s => matchStudent(s));
-        if (found) return { ...found, kelas: cls };
+        for (const s of list) {
+          const sId = s.id.toUpperCase();
+          if (
+            sId === q ||
+            (s.nisn && s.nisn.toUpperCase() === q) ||
+            q.endsWith('-' + sId)
+          ) {
+            return { ...s, kelas: cls };
+          }
+        }
       }
 
-      // 3. Cek di seluruh ruang Mapel / Ekskul lalu petakan ke masterStudents
+      // 3. Cek di seluruh ruang Mapel / Ekskul
       for (const rId of Object.keys(appData.roomStudents || {})) {
         const rList = appData.roomStudents[rId] || [];
-        const found = rList.find(s => matchStudent(s));
-        if (found) {
-          const cls = normalizeClassCode(found.kelas);
-          const masterMatch = (appData.masterStudents[cls] || []).find(
-            m => cleanKey(m.name) === cleanKey(found.name) || (found.nisn && cleanKey(m.nisn) === cleanKey(found.nisn))
-          );
-          return masterMatch ? { ...masterMatch, kelas: cls } : found;
-        }
+        const found = rList.find(s =>
+          s.id.toUpperCase() === q ||
+          (s.nisn && s.nisn.toUpperCase() === q)
+        );
+        if (found) return found;
+      }
+
+      // 4. Pencarian sebagian nama (minimal 4 huruf)
+      if (q.length >= 4) {
+        const searchPool = preferredClass && appData.masterStudents[preferredClass]
+          ? appData.masterStudents[preferredClass]
+          : ALL_CLASSES.flatMap(c => appData.masterStudents[c] || []);
+        const byName = searchPool.find(s => s.name.toUpperCase().includes(q));
+        if (byName) return byName;
       }
 
       return null;
@@ -1755,12 +1761,54 @@ let isPushingToCloud = false;
        PORTAL PUBLIK: ABSEN PAGI & IZIN FOTO LANGSUNG
        ========================================================================= */
     function switchPublicTab(tab) {
+      if (tab === 'pagi' && !isPagiUnlocked) {
+        document.getElementById('pagiPinVerifyInput').value = '';
+        document.getElementById('pagiPinErrorMsg').classList.add('hidden');
+        document.getElementById('pagiPinModal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('pagiPinVerifyInput')?.focus(), 80);
+        return;
+      }
       stopAllCameras();
       document.getElementById('publicPagiSection').classList.toggle('hidden', tab !== 'pagi');
       document.getElementById('publicIzinSection').classList.toggle('hidden', tab !== 'izin');
       document.getElementById('pubTabPagi').classList.toggle('active', tab === 'pagi');
       document.getElementById('pubTabIzin').classList.toggle('active', tab === 'izin');
       if (tab === 'izin') populateIzinClassDropdown();
+      if (tab === 'pagi') refreshPagiUI();
+    }
+
+    function handlePagiPinSubmit(e) {
+      e.preventDefault();
+      const inputPin = document.getElementById('pagiPinVerifyInput').value.trim();
+      const validPagiPin = String(appData.pagiPin || '1122');
+      const validAdminPin = String(appData.adminPin || '9999');
+      const errEl = document.getElementById('pagiPinErrorMsg');
+
+      if (inputPin !== validPagiPin && inputPin !== validAdminPin) {
+        errEl.textContent = 'PIN salah! Hanya petugas piket/guru yang dapat membuka Absen Pagi.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      isPagiUnlocked = true;
+      const tabBtn = document.getElementById('pubTabPagi');
+      if (tabBtn) tabBtn.textContent = '☀️ Absen Pagi (Non-Mapel)';
+      closeModal('pagiPinModal');
+      switchPublicTab('pagi');
+      showToast('success', 'Absen Pagi Terbuka', 'Mode pemindaian absen pagi siap digunakan petugas.');
+    }
+
+    function saveAdminPagiPin() {
+      const inp = document.getElementById('adminPagiPinInput');
+      if (!inp) return;
+      const newPin = inp.value.trim();
+      if (newPin.length < 4) {
+        showToast('error', 'PIN Terlalu Pendek', 'Masukkan minimal 4 digit PIN untuk Absen Pagi.');
+        return;
+      }
+      appData.pagiPin = newPin;
+      saveAppData();
+      showToast('success', 'PIN Absen Pagi Disimpan', `PIN baru (${newPin}) telah aktif dan tersinkron.`);
     }
 
     function initPublicSelectors() {
@@ -2053,7 +2101,11 @@ let isPushingToCloud = false;
 
     function logoutRole() {
       stopAllCameras();
+      isPagiUnlocked = false;
+      const tabBtn = document.getElementById('pubTabPagi');
+      if (tabBtn) tabBtn.textContent = '🔒 Absen Pagi (Non-Mapel)';
       currentSession = { role: 'public', roomId: 'mapel_mtk' };
+      switchPublicTab('izin');
       applySessionView();
       showToast('info', 'Keluar dari Akun', 'Kembali ke Mode Publik / Siswa.');
     }
@@ -2084,7 +2136,6 @@ let isPushingToCloud = false;
 
         document.getElementById('adminRoomSwitcher').classList.toggle('hidden', !isAdmin);
         document.getElementById('wsTabBtnAdmin').classList.toggle('hidden', !isAdmin);
-        document.getElementById('wsTabBtnKartu').classList.toggle('hidden', !isAdmin);
         populateWsRoomAndClassFilters();
         switchWsTab('scan');
         refreshWorkspaceUI();
@@ -2156,13 +2207,7 @@ let isPushingToCloud = false;
         document.getElementById(map[k][1])?.classList.toggle('active', k === tab);
       });
 
-      if (tab === 'kartu') {
-        if (currentSession.role !== 'admin') {
-          showToast('error', 'Akses Dibatasi', 'Cetak Kartu QR hanya dapat diakses oleh Admin Sekolah atau Wali Kelas.');
-          return;
-        }
-        renderQrCards();
-      }
+      if (tab === 'kartu') renderQrCards();
       if (tab === 'sholat') renderWsSholatTable();
       if (tab === 'agamaRekap') renderAgamaSholatRekap();
       if (tab === 'admin') renderAdminPanel();
@@ -2290,10 +2335,9 @@ let isPushingToCloud = false;
 
       const roomList = appData.roomStudents[room.id] || [];
       let targetStudent = roomList.find(s =>
-        (found.nisn && cleanKey(s.nisn) === cleanKey(found.nisn)) ||
-        cleanKey(s.name) === cleanKey(found.name) ||
-        cleanKey(s.id) === cleanKey(found.id) ||
-        normalizeStudentCode(s.id) === normalizeStudentCode(found.id)
+        (found.nisn && s.nisn === found.nisn) ||
+        s.name.toUpperCase() === found.name.toUpperCase() ||
+        s.id.toUpperCase() === found.id.toUpperCase()
       );
 
       if (!targetStudent) {
@@ -2390,25 +2434,25 @@ let isPushingToCloud = false;
     /* =========================================================================
        ABSEN SHOLAT (GURU AGAMA & GURU WALI)
        ========================================================================= */
-    function recordSholatForStudent(masterStudent, sholatType, dateStr, status = 'Jamaah') {
-      const cls = normalizeClassCode(masterStudent.kelas);
-      const masterList = (appData.masterStudents && appData.masterStudents[cls]) || [];
-      const canonical = masterList.find(s =>
-        cleanKey(s.id) === cleanKey(masterStudent.id) ||
-        (masterStudent.nisn && cleanKey(s.nisn) === cleanKey(masterStudent.nisn)) ||
-        cleanKey(s.name) === cleanKey(masterStudent.name)
-      ) || masterStudent;
+   function recordSholatForStudent(masterStudent, sholatType, dateStr, status = 'Jamaah') {
+  const cls = normalizeClassCode(masterStudent.kelas);
+  const masterList = (appData.masterStudents && appData.masterStudents[cls]) || [];
+  const canonical = masterList.find(s =>
+    s.id === masterStudent.id ||
+    (masterStudent.nisn && s.nisn === masterStudent.nisn) ||
+    s.name.toUpperCase() === String(masterStudent.name || '').toUpperCase()
+  ) || masterStudent;
 
-      if (!appData.sholatAttendance) appData.sholatAttendance = {};
-      if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
-      if (!appData.sholatAttendance[dateStr][sholatType]) appData.sholatAttendance[dateStr][sholatType] = {};
-      if (!appData.sholatAttendance[dateStr][sholatType][cls]) appData.sholatAttendance[dateStr][sholatType][cls] = {};
+  if (!appData.sholatAttendance) appData.sholatAttendance = {};
+  if (!appData.sholatAttendance[dateStr]) appData.sholatAttendance[dateStr] = {};
+  if (!appData.sholatAttendance[dateStr][sholatType]) appData.sholatAttendance[dateStr][sholatType] = {};
+  if (!appData.sholatAttendance[dateStr][sholatType][cls]) appData.sholatAttendance[dateStr][sholatType][cls] = {};
 
-      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-      appData.sholatAttendance[dateStr][sholatType][cls][canonical.id] = { status, time: timeStr };
-      saveAppData();
-      showToast('success', `Sholat ${sholatType}: ${status}`, `${canonical.name} (${cls}) • ${timeStr}`);
-    }
+  const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  appData.sholatAttendance[dateStr][sholatType][cls][canonical.id] = { status, time: timeStr };
+  saveAppData();
+  showToast('success', `Sholat ${sholatType}: ${status}`, `${canonical.name} (${cls}) • ${timeStr}`);
+}
     function handleWsSholatManualScan(e) {
       e.preventDefault();
       const inp = document.getElementById('wsSholatCodeInput');
@@ -2612,10 +2656,6 @@ let isPushingToCloud = false;
       if (hrDate && !hrDate.value) hrDate.value = getTodayISO();
 
       const bkSel = document.getElementById('bkClassSelector');
-      const btnWaliCard = document.getElementById('btnWaliPrintCards');
-      if (btnWaliCard) btnWaliCard.classList.toggle('hidden', currentSession.role !== 'wali_kelas');
-      document.getElementById('waliPrintCardsSection')?.classList.add('hidden');
-
       if (currentSession.role === 'guru_bk') {
         const lvl = currentSession.level || 'VII';
         const levelClasses = ALL_CLASSES.filter(c => lvl === 'VII' ? /^VII[A-G]$/.test(c) : lvl === 'VIII' ? /^VIII[A-G]$/.test(c) : /^IX[A-G]$/.test(c));
@@ -2716,64 +2756,37 @@ let isPushingToCloud = false;
       return `<div class="mono" style="padding:1rem; text-align:center;">${text}</div>`;
     }
 
-    function buildStudentIdCardsHtml(students) {
-      const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
-      if (!students || students.length === 0) {
-        return `<p style="color:var(--text-muted); padding:1rem;">Tidak ada data siswa untuk dicetak pada kelas ini.</p>`;
-      }
-      return students.map(s => {
-        const cls = normalizeClassCode(s.kelas);
-        const masterMatch = (appData.masterStudents[cls] || []).find(
-          m => (s.nisn && cleanKey(m.nisn) === cleanKey(s.nisn)) || cleanKey(m.name) === cleanKey(s.name)
-        );
-        const cardCode = masterMatch ? masterMatch.id : normalizeStudentCode(s.id);
-        return `
-          <div class="id-card">
-            <div class="id-card-header">
-              <img src="${logo}" alt="Logo Sekolah" class="id-card-logo" />
-              <div class="id-card-school">
-                <h4>SMP NEGERI 1 TEMPURAN</h4>
-                <p>Kartu Absensi Terpadu • Wajib Dibawa</p>
-              </div>
-            </div>
-            <div class="id-card-qr">${generateIsoQrSvg(cardCode)}</div>
-            <div class="id-card-meta">
-              <div><span class="lbl">Nama</span><span class="val">: ${s.name}</span></div>
-              <div><span class="lbl">Kelas</span><span class="val">: ${cls}</span></div>
-              <div><span class="lbl">NISN</span><span class="val">: ${s.nisn || '-'}</span></div>
-              <div><span class="lbl">Kode</span><span class="val mono">: ${cardCode}</span></div>
-            </div>
-            <div class="id-card-footer">Kartu Tunggal: Pagi • Sholat • Semua Mapel</div>
-          </div>
-        `;
-      }).join('');
-    }
-
     function renderQrCards() {
       const grid = document.getElementById('qrCardsGrid');
       if (!grid) return;
       const room = getActiveWsRoom();
-      const filter = document.getElementById('wsClassFilter')?.value || 'VIIA';
-      const students = isEkskulRoom(room)
-        ? getFilteredWsStudents()
-        : (appData.masterStudents[normalizeClassCode(filter)] || []);
-      grid.innerHTML = buildStudentIdCardsHtml(students);
-    }
+      const students = getFilteredWsStudents();
+      const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
 
-    function toggleWaliCardPrintSection(forceState = null) {
-      if (currentSession.role !== 'wali_kelas') {
-        showToast('error', 'Akses Dibatasi', 'Fitur cetak kartu ini khusus untuk Wali Kelas.');
+      if (students.length === 0) {
+        grid.innerHTML = `<p style="color:var(--text-muted); padding:1rem;">Tidak ada data siswa untuk dicetak pada kelas/sesi ini.</p>`;
         return;
       }
-      const sec = document.getElementById('waliPrintCardsSection');
-      if (!sec) return;
-      const show = forceState !== null ? forceState : sec.classList.contains('hidden');
-      sec.classList.toggle('hidden', !show);
-      if (show) {
-        const cls = currentSession.kelas;
-        const students = appData.masterStudents[cls] || [];
-        document.getElementById('waliQrCardsGrid').innerHTML = buildStudentIdCardsHtml(students);
-      }
+
+      grid.innerHTML = students.map(s => `
+        <div class="id-card">
+          <div class="id-card-header">
+            <img src="${logo}" alt="Logo Sekolah" class="id-card-logo" />
+            <div class="id-card-school">
+              <h4>SMP NEGERI 1 TEMPURAN</h4>
+              <p>Kartu Absensi Resmi dan Wajib Dibawa</p>
+            </div>
+          </div>
+          <div class="id-card-qr">${generateIsoQrSvg(s.id)}</div>
+          <div class="id-card-meta">
+            <div><span class="lbl">Nama</span><span class="val">: ${s.name}</span></div>
+            <div><span class="lbl">Kelas</span><span class="val">: ${s.kelas}</span></div>
+            <div><span class="lbl">NISN</span><span class="val">: ${s.nisn || '-'}</span></div>
+            <div><span class="lbl">Kode</span><span class="val mono">: ${s.id}</span></div>
+          </div>
+          <div class="id-card-footer">${room.name} • Sistem Absensi Digital</div>
+        </div>
+      `).join('');
     }
 
     function handleSchoolLogoUpload(e) {
@@ -2793,6 +2806,9 @@ let isPushingToCloud = false;
        PANEL ADMIN SEKOLAH & BANK DATA KELAS INDUK (TERMASUK "SEMUA DATA")
        ========================================================================= */
     function renderAdminPanel() {
+      const pagiPinInp = document.getElementById('adminPagiPinInput');
+      if (pagiPinInp) pagiPinInp.value = appData.pagiPin || '1122';
+
       const urlInp = document.getElementById('adminAppsScriptUrlInput');
       if (urlInp) urlInp.value = getAppsScriptUrl();
 
