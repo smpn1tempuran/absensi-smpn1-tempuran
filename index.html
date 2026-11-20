@@ -1938,101 +1938,131 @@
       pullStateFromAppsScript(true);
     }
 
-    async function pushStateToAppsScript(notifyUser = false) {
-  let url = getAppsScriptUrl();
-  if (!url || !appData) return;
-  if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
-    url = url.replace(/\/$/, '') + '/absensi.json';
-  }
-  try {
-    const payloadObj = { ...appData };
-    delete payloadObj._isFreshDefault;
-    payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
-    const serialized = JSON.stringify(payloadObj);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: serialized,
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-
-    lastCloudSnapshotHash = serialized;
-    hasUnsyncedLocalChanges = false;
-    updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
-    if (notifyUser) {
-      showToast('success', 'Terkirim ke Cloud', 'Seluruh data absensi berhasil disimpan ke Firebase.');
-    }
-  } catch (err) {
-    updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
-    if (notifyUser) {
-      showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
-    }
-  }
-}
-
-async function pullStateFromAppsScript(notifyUser = false) {
-  let url = getAppsScriptUrl();
-  if (!url || isSyncingFromCloud) return;
-  if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 12000)) {
-    return;
-  }
-  if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
-    url = url.replace(/\/$/, '') + '/absensi.json';
-  }
-  isSyncingFromCloud = true;
-  try {
-    const sep = url.includes('?') ? '&' : '?';
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const incoming = await res.json();
-
-    const trimmed = JSON.stringify(incoming || {});
-    if (!incoming || !Array.isArray(incoming.rooms) || !incoming.masterStudents) {
-      updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
-      if (!appData._isFreshDefault) {
-        await pushStateToAppsScript(false);
+    function encodeFirebaseKeys(obj) {
+      if (Array.isArray(obj)) return obj.map(encodeFirebaseKeys);
+      if (obj && typeof obj === 'object') {
+        const clean = {};
+        for (const k of Object.keys(obj)) {
+          const safeKey = k.replace(/\./g, '_DOT_').replace(/[#\$\[\]\/]/g, '_');
+          clean[safeKey] = encodeFirebaseKeys(obj[k]);
+        }
+        return clean;
       }
-      return;
+      return obj;
     }
 
-    updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
-    const localTime = Number(appData._updatedAt || 0);
-    const remoteTime = Number(incoming._updatedAt || 0);
-
-    if (!appData._isFreshDefault && !notifyUser && localTime > 0 && remoteTime > 0 && remoteTime < localTime) {
-      await pushStateToAppsScript(false);
-      return;
+    function decodeFirebaseKeys(obj) {
+      if (Array.isArray(obj)) return obj.map(decodeFirebaseKeys);
+      if (obj && typeof obj === 'object') {
+        const restored = {};
+        for (const k of Object.keys(obj)) {
+          const origKey = k.replace(/_DOT_/g, '.');
+          restored[origKey] = decodeFirebaseKeys(obj[k]);
+        }
+        return restored;
+      }
+      return obj;
     }
 
-    if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser || appData._isFreshDefault)) {
-      lastCloudSnapshotHash = trimmed;
-      hasUnsyncedLocalChanges = false;
-      appData = incoming;
-      delete appData._isFreshDefault;
-      ensureAsesmenDefaults();
-      localStorage.setItem(STORAGE_KEY, trimmed);
-      rerenderActiveRoleView();
+    async function pushStateToAppsScript(notifyUser = false) {
+      let url = getAppsScriptUrl();
+      if (!url || !appData) return;
+      if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
+        url = url.replace(/\/$/, '') + '/absensi.json';
+      }
+      try {
+        const payloadObj = encodeFirebaseKeys({ ...appData });
+        delete payloadObj._isFreshDefault;
+        payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
+        const serialized = JSON.stringify(payloadObj);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: serialized,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          throw new Error(`HTTP ${res.status} ${errText}`);
+        }
+
+        lastCloudSnapshotHash = JSON.stringify(decodeFirebaseKeys(payloadObj));
+        hasUnsyncedLocalChanges = false;
+        updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+        if (notifyUser) {
+          showToast('success', 'Terkirim ke Cloud', 'Seluruh data absensi berhasil disimpan ke Firebase.');
+        }
+      } catch (err) {
+        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
+        if (notifyUser) {
+          showToast('error', 'Gagal Mengirim ke Cloud', err.message || 'Periksa koneksi internet Anda.');
+        }
+      }
     }
-    if (notifyUser) {
-      showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Firebase Cloud sudah dimuat.');
+
+    async function pullStateFromAppsScript(notifyUser = false) {
+      let url = getAppsScriptUrl();
+      if (!url || isSyncingFromCloud) return;
+      if (!notifyUser && (hasUnsyncedLocalChanges || Date.now() - lastLocalMutationAt < 12000)) {
+        return;
+      }
+      if (url.includes('firebasedatabase.app') && !url.endsWith('.json')) {
+        url = url.replace(/\/$/, '') + '/absensi.json';
+      }
+      isSyncingFromCloud = true;
+      try {
+        const sep = url.includes('?') ? '&' : '?';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const rawIncoming = await res.json();
+        const incoming = decodeFirebaseKeys(rawIncoming);
+
+        const trimmed = JSON.stringify(incoming || {});
+        if (!incoming || !Array.isArray(incoming.rooms) || !incoming.masterStudents) {
+          updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+          if (!appData._isFreshDefault) {
+            await pushStateToAppsScript(false);
+          }
+          return;
+        }
+
+        updateCloudPillUI('online', '🟢 Firebase Cloud Aktif');
+        const localTime = Number(appData._updatedAt || 0);
+        const remoteTime = Number(incoming._updatedAt || 0);
+
+        if (!appData._isFreshDefault && !notifyUser && localTime > 0 && remoteTime > 0 && remoteTime < localTime) {
+          await pushStateToAppsScript(false);
+          return;
+        }
+
+        if (trimmed !== lastCloudSnapshotHash && (!hasUnsyncedLocalChanges || notifyUser || appData._isFreshDefault)) {
+          lastCloudSnapshotHash = trimmed;
+          hasUnsyncedLocalChanges = false;
+          appData = incoming;
+          delete appData._isFreshDefault;
+          ensureAsesmenDefaults();
+          localStorage.setItem(STORAGE_KEY, trimmed);
+          rerenderActiveRoleView();
+        }
+        if (notifyUser) {
+          showToast('success', 'Sinkronisasi Selesai', 'Data terbaru dari Firebase Cloud sudah dimuat.');
+        }
+      } catch (err) {
+        updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
+        if (notifyUser) {
+          showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan URL Firebase & Rules sudah aktif.');
+        }
+      } finally {
+        isSyncingFromCloud = false;
+      }
     }
-  } catch (err) {
-    updateCloudPillUI('offline', '⚠️ Mode Lokal (Cloud Belum Terhubung)');
-    if (notifyUser) {
-      showToast('error', 'Gagal Menarik Data Cloud', 'Pastikan URL Firebase & Rules sudah aktif.');
-    }
-  } finally {
-    isSyncingFromCloud = false;
-  }
-}
     /* =========================================================================
        PENCARIAN SISWA LINTAS FORMAT QR / NISN / NAMA
        ========================================================================= */
