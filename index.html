@@ -1403,16 +1403,44 @@
         </div>
       </section>
 
-      <!-- PANITIA TAB 3: EDIT PEMBAGIAN RUANG ASSESMEN -->
+      <!-- PANITIA TAB 3: EDIT PEMBAGIAN RUANG ASSESMEN & DATA SISWA -->
       <section id="pnTabEditRuang" class="hidden">
+        <div class="card" style="margin-bottom:1rem; background:#f8fafc; border:1.5px solid #cbd5e1;">
+          <div class="card-header" style="margin-bottom:0.65rem;">
+            <div>
+              <h3>📂 Upload Data Siswa &amp; Pembagian Ruang Otomatis / Manual</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Unggah daftar siswa per kelas dari Excel/CSV agar otomatis masuk ke daftar hadir, kartu QR, dan pembagian ruang ujian.</p>
+            </div>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+              <button type="button" class="btn btn-outline btn-sm" onclick="downloadMasterTemplateCSV()">⬇️ Download Template CSV Siswa</button>
+              <button type="button" class="btn btn-info btn-sm" onclick="document.getElementById('panitiaMasterCsvUpload').click()">⬆️ Upload Data Siswa (CSV)</button>
+              <input type="file" id="panitiaMasterCsvUpload" accept=".csv,.txt" class="hidden" onchange="importMasterStudentsCSV(event)" />
+              <button type="button" class="btn btn-success btn-sm" onclick="exportMasterStudentsCSV()">📤 Export Data Siswa</button>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:0.6rem; align-items:center; justify-content:space-between; background:#ffffff; padding:0.75rem; border-radius:10px; border:1px solid #e2e8f0;">
+            <div style="display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center;">
+              <strong style="font-size:0.82rem; color:#0b1d47;">⚡ Pembagian Ruang Otomatis:</strong>
+              <label style="font-size:0.78rem; color:var(--text-muted);">Kapasitas Maks / Ruang:</label>
+              <input type="number" id="autoRoomCapacityInput" class="form-control" style="width:78px; padding:0.35rem 0.5rem;" min="10" max="60" value="32" />
+              <select id="autoRoomModeSelect" class="form-control" style="width:auto; padding:0.35rem 0.6rem; font-weight:700;">
+                <option value="mix_levels">Silang 2 Jenjang (9 &amp; 7, 8 &amp; 7, 9 &amp; 8 — Rekomendasi)</option>
+                <option value="sequential">Urut per Kelas (VIIA – IXG)</option>
+              </select>
+              <button type="button" class="btn btn-primary btn-sm" onclick="generateAutoAsesmenRooms()">⚡ Bagi Ruang Otomatis</button>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted);">Atau klik <strong>✏️ Edit</strong> di tabel bawah untuk atur manual per ruang.</span>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <div>
-              <h3>✏️ Edit Pembagian Ruang Assesmen (R.1 – R.21)</h3>
-              <p style="font-size:0.78rem; color:var(--text-muted);">Sesuaikan kelas, rentang nomor absen (urutan nama siswa sesuai kelas induk), maupun PIN login pengawas ruang.</p>
+              <h3>✏️ Daftar Pembagian Ruang Assesmen (Manual &amp; Otomatis)</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Sesuaikan kelas, rentang nomor absen (urutan nama siswa sesuai data siswa), maupun PIN login pengawas ruang.</p>
             </div>
             <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
-              <button type="button" class="btn btn-primary btn-sm" onclick="openEditAsesmenRoomModal('NEW')">+ Tambah Ruang Baru</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="openEditAsesmenRoomModal('NEW')">+ Tambah Ruang Manual</button>
               <button type="button" class="btn btn-warning btn-sm" onclick="resetDefaultAsesmenRooms()">🔄 Reset ke Tabel Default (R.1–R.21)</button>
             </div>
           </div>
@@ -1487,15 +1515,28 @@
         </div>
       </section>
 
-      <!-- PANITIA TAB 6: CETAK DAFTAR HADIR RESMI ASSESMEN AKHIR SEMESTER GASAL -->
+      <!-- PANITIA TAB 6: CETAK DAFTAR HADIR RESMI ASSESMEN -->
       <section id="pnTabCetakHadir" class="hidden">
         <div class="card">
           <div class="card-header no-print">
             <div>
-              <h3>🖨️ Cetak Daftar Hadir Peserta Assesmen Akhir Semester Gasal 2026/2027</h3>
-              <p style="font-size:0.78rem; color:var(--text-muted);">Hanya dapat diakses &amp; dicetak melalui akun Panitia Assesmen. Ruang, Hari/Tanggal, Sesi, dan Mata Pelajaran otomatis menyesuaikan pilihan.</p>
+              <h3>🖨️ Cetak Daftar Hadir Peserta Assesmen Resmi</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Judul jenis asesmen, tahun pelajaran, ruang, sesi, mata pelajaran, dan nama peserta didik otomatis menyesuaikan pilihan.</p>
             </div>
-            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center;">
+              <select id="pnCetakExamTypeSelect" class="form-control" style="width:auto; font-weight:800;" onchange="onPanitiaPrintHeaderChange()">
+                <option value="ASESMEN SUMATIF TENGAH SEMESTER">Asesmen Sumatif Tengah Semester</option>
+                <option value="ASESMEN SUMATIF AKHIR SEMESTER" selected>Asesmen Sumatif Akhir Semester</option>
+                <option value="ASESMEN SUMATIF AKHIR TAHUN">Asesmen Sumatif Akhir Tahun</option>
+              </select>
+              <select id="pnCetakAcademicYearSelect" class="form-control" style="width:auto; font-weight:800;" onchange="onPanitiaPrintHeaderChange()">
+                <option value="2025/2026">TP 2025/2026</option>
+                <option value="2026/2027" selected>TP 2026/2027</option>
+                <option value="2027/2028">TP 2027/2028</option>
+                <option value="2028/2029">TP 2028/2029</option>
+                <option value="2029/2030">TP 2029/2030</option>
+                <option value="2030/2031">TP 2030/2031</option>
+              </select>
               <select id="pnCetakRoomSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderPanitiaCetakDaftarHadir()">
                 <option value="R.1">Ruang R.1</option>
               </select>
@@ -1930,6 +1971,8 @@
     function ensureAsesmenDefaults() {
       if (!appData) return;
       if (!appData.panitiaPin) appData.panitiaPin = '6060';
+      if (!appData.asesmenExamType) appData.asesmenExamType = 'ASESMEN SUMATIF AKHIR SEMESTER';
+      if (!appData.asesmenAcademicYear) appData.asesmenAcademicYear = '2026/2027';
       if (!Array.isArray(appData.asesmenRooms) || appData.asesmenRooms.length === 0) {
         appData.asesmenRooms = JSON.parse(JSON.stringify(DEFAULT_ASESMEN_ROOMS));
       }
@@ -3695,6 +3738,7 @@
         renderAdminMasterClassTable();
         refreshWorkspaceUI();
         renderQrCards();
+        if (currentSession.role === 'panitia') refreshPanitiaDashboard();
         showToast('success', 'Import Berhasil & Tersimpan', `${totalImported} siswa diimpor, Kartu QR otomatis ter-generate & disinkronkan ke Cloud.`);
       };
       reader.readAsText(file);
@@ -4137,8 +4181,112 @@
       return `${days[d.getDay()]}, ${String(parts[2]).padStart(2, '0')} ${months[parts[1] - 1]} ${parts[0]}`;
     }
 
+    function onPanitiaPrintHeaderChange() {
+      ensureAsesmenDefaults();
+      const typeSel = document.getElementById('pnCetakExamTypeSelect');
+      const yearSel = document.getElementById('pnCetakAcademicYearSelect');
+      if (typeSel) appData.asesmenExamType = typeSel.value;
+      if (yearSel) appData.asesmenAcademicYear = yearSel.value;
+      saveAppData();
+      renderPanitiaCetakDaftarHadir();
+    }
+
+    function generateAutoAsesmenRooms() {
+      ensureAsesmenDefaults();
+      const cap = Math.max(10, Math.min(60, parseInt(document.getElementById('autoRoomCapacityInput')?.value, 10) || 32));
+      const mode = document.getElementById('autoRoomModeSelect')?.value || 'mix_levels';
+      const halfCap = Math.max(1, Math.floor(cap / 2));
+      const generated = [];
+
+      if (mode === 'mix_levels') {
+        const g9 = ['IXA', 'IXB', 'IXC', 'IXD', 'IXE', 'IXF', 'IXG'];
+        const g8 = ['VIIIA', 'VIIIB', 'VIIIC', 'VIIID', 'VIIIE', 'VIIIF', 'VIIIG'];
+        const g7 = ['VIIA', 'VIIB', 'VIIC', 'VIID', 'VIIE', 'VIIF', 'VIIG'];
+
+        const chunks9 = [], chunks8 = [], chunks7 = [];
+        const pushChunks = (clsList, targetArr) => {
+          clsList.forEach(cls => {
+            const total = (appData.masterStudents[cls] || []).length;
+            if (total === 0) return;
+            for (let start = 1; start <= total; start += halfCap) {
+              targetArr.push({ kelas: cls, start, end: Math.min(total, start + halfCap - 1) });
+            }
+          });
+        };
+        pushChunks(g9, chunks9);
+        pushChunks(g8, chunks8);
+        pushChunks(g7, chunks7);
+
+        let roomIdx = 1;
+        // Pasangkan Kelas 9 & Kelas 7
+        const pair97 = Math.min(chunks9.length, chunks7.length);
+        for (let i = 0; i < pair97; i++) {
+          const c1 = chunks9.shift(), c2 = chunks7.shift();
+          generated.push({ id: `R.${roomIdx}`, name: `R.${roomIdx}`, kelas1: c1.kelas, start1: c1.start, end1: c1.end, kelas2: c2.kelas, start2: c2.start, end2: c2.end, pin: '5050' });
+          roomIdx++;
+        }
+        // Pasangkan Kelas 8 & sisa Kelas 7
+        const pair87 = Math.min(chunks8.length, chunks7.length);
+        for (let i = 0; i < pair87; i++) {
+          const c1 = chunks8.shift(), c2 = chunks7.shift();
+          generated.push({ id: `R.${roomIdx}`, name: `R.${roomIdx}`, kelas1: c1.kelas, start1: c1.start, end1: c1.end, kelas2: c2.kelas, start2: c2.start, end2: c2.end, pin: '5050' });
+          roomIdx++;
+        }
+        // Pasangkan sisa Kelas 9 & Kelas 8
+        const pair98 = Math.min(chunks9.length, chunks8.length);
+        for (let i = 0; i < pair98; i++) {
+          const c1 = chunks9.shift(), c2 = chunks8.shift();
+          generated.push({ id: `R.${roomIdx}`, name: `R.${roomIdx}`, kelas1: c1.kelas, start1: c1.start, end1: c1.end, kelas2: c2.kelas, start2: c2.start, end2: c2.end, pin: '5050' });
+          roomIdx++;
+        }
+        // Sisa kelompok tunggal jika masih ada
+        [...chunks9, ...chunks8, ...chunks7].forEach(rem => {
+          generated.push({ id: `R.${roomIdx}`, name: `R.${roomIdx}`, kelas1: rem.kelas, start1: rem.start, end1: rem.end, kelas2: '', start2: 0, end2: 0, pin: '5050' });
+          roomIdx++;
+        });
+      } else {
+        let roomIdx = 1;
+        ALL_CLASSES.forEach(cls => {
+          const total = (appData.masterStudents[cls] || []).length;
+          if (total === 0) return;
+          for (let start = 1; start <= total; start += cap) {
+            generated.push({ id: `R.${roomIdx}`, name: `R.${roomIdx}`, kelas1: cls, start1: start, end1: Math.min(total, start + cap - 1), kelas2: '', start2: 0, end2: 0, pin: '5050' });
+            roomIdx++;
+          }
+        });
+      }
+
+      if (generated.length === 0) {
+        showToast('error', 'Data Siswa Kosong', 'Silakan upload data siswa terlebih dahulu.');
+        return;
+      }
+
+      appData.asesmenRooms = generated;
+      saveAppData();
+      refreshPanitiaDashboard();
+      showToast('success', 'Pembagian Ruang Otomatis Selesai', `Terbentuk ${generated.length} ruang ujian sesuai jumlah siswa per kelas.`);
+    }
+
     function renderPanitiaCetakDaftarHadir() {
       ensureAsesmenDefaults();
+      const typeSel = document.getElementById('pnCetakExamTypeSelect');
+      const yearSel = document.getElementById('pnCetakAcademicYearSelect');
+      if (typeSel && [...typeSel.options].some(o => o.value === appData.asesmenExamType)) {
+        typeSel.value = appData.asesmenExamType;
+      }
+      if (yearSel) {
+        if (![...yearSel.options].some(o => o.value === appData.asesmenAcademicYear)) {
+          const opt = document.createElement('option');
+          opt.value = appData.asesmenAcademicYear;
+          opt.textContent = `TP ${appData.asesmenAcademicYear}`;
+          yearSel.appendChild(opt);
+        }
+        yearSel.value = appData.asesmenAcademicYear;
+      }
+
+      const examTitle = (typeSel ? typeSel.value : appData.asesmenExamType) || 'ASESMEN SUMATIF AKHIR SEMESTER';
+      const academicYear = (yearSel ? yearSel.value : appData.asesmenAcademicYear) || '2026/2027';
+
       const roomSel = document.getElementById('pnCetakRoomSelect');
       const area = document.getElementById('pnOfficialAttendancePrintArea');
       if (!roomSel || !area) return;
@@ -4155,7 +4303,6 @@
       const dayDateText = schedInfo.found ? schedInfo.dayLabel : formatIndonesianDayDate(dateStr);
       const participants = getAsesmenRoomParticipants(roomCfg);
       const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[roomCfg.id] || {};
-      const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
 
       let hadir = 0, sakit = 0, izin = 0, alpa = 0, belum = 0;
       const rowsHtml = participants.map(p => {
@@ -4186,17 +4333,8 @@
       }).join('');
 
       area.innerHTML = `
-        <div class="official-kop">
-          <img src="${logo}" alt="Logo SMPN 1 Tempuran" />
-          <div class="official-kop-text">
-            <div class="instansi">Pemerintah Kabupaten Magelang • Dinas Pendidikan dan Kebudayaan</div>
-            <div class="sekolah">SMP NEGERI 1 TEMPURAN</div>
-            <div class="alamat">Jl. Raya Magelang – Purworejo Km. 10, Tempuran, Kabupaten Magelang</div>
-          </div>
-        </div>
-
         <div class="official-title-box">
-          <h4>DAFTAR HADIR PESERTA<br/>ASSESMEN AKHIR SEMESTER GASAL<br/>TAHUN PELAJARAN 2026/2027</h4>
+          <h4>DAFTAR HADIR PESERTA<br/>${examTitle}<br/>TAHUN PELAJARAN ${academicYear}</h4>
         </div>
 
         <div class="official-meta-grid">
