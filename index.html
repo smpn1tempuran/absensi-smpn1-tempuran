@@ -442,12 +442,124 @@
     .toast.success { border-left-color: #10b981; }
     .toast.error { border-left-color: #f43f5e; }
 
+    /* FORMAT CETAK DAFTAR HADIR RESMI ASSESMEN */
+    .official-sheet {
+      background: #ffffff;
+      color: #000000;
+      padding: 1rem 1.25rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+    }
+    .official-kop {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      border-bottom: 3px double #000000;
+      padding-bottom: 0.6rem;
+      margin-bottom: 0.85rem;
+    }
+    .official-kop img {
+      width: 62px;
+      height: 62px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .official-kop-text {
+      flex: 1;
+      text-align: center;
+    }
+    .official-kop-text .instansi {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .official-kop-text .sekolah {
+      font-size: 1.15rem;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+    .official-kop-text .alamat {
+      font-size: 0.72rem;
+      color: #334155;
+    }
+    .official-title-box {
+      text-align: center;
+      margin-bottom: 0.85rem;
+    }
+    .official-title-box h4 {
+      font-size: 1rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      line-height: 1.3;
+    }
+    .official-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.25rem 1.5rem;
+      font-size: 0.82rem;
+      margin-bottom: 0.75rem;
+    }
+    .official-meta-row {
+      display: flex;
+    }
+    .official-meta-row .lbl {
+      width: 135px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .official-meta-row .val {
+      font-weight: 800;
+    }
+    .official-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      color: #000000;
+    }
+    .official-table th, .official-table td {
+      border: 1px solid #000000;
+      padding: 0.36rem 0.45rem;
+    }
+    .official-table th {
+      background: #e2e8f0;
+      color: #000000;
+      font-weight: 800;
+      text-align: center;
+    }
+    .official-footer-sign {
+      margin-top: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      font-size: 0.8rem;
+      page-break-inside: avoid;
+    }
+    .official-rekap-box {
+      border: 1px solid #000000;
+      padding: 0.5rem 0.75rem;
+      min-width: 220px;
+    }
+    .official-rekap-box div {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+    .official-ttd-box {
+      text-align: left;
+      min-width: 230px;
+    }
+
     @media print {
-      .app-header, .tab-nav, .no-print, .toast-wrap { display: none !important; }
+      .app-header, .tab-nav, .no-print, .toast-wrap, .hero-card { display: none !important; }
       body { background: #ffffff; }
       .container { max-width: 100%; padding: 0; }
       .card { border: none; box-shadow: none; padding: 0; }
       .qr-grid { grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+      .official-sheet { border: none; padding: 0; }
+      .official-table th { background: #e2e8f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
   </style>
 </head>
@@ -1221,6 +1333,8 @@
         <button type="button" id="pnTabBtnDetail" class="tab-btn" onclick="switchPanitiaTab('detail')">👥 Detail Peserta &amp; Belum Hadir</button>
         <button type="button" id="pnTabBtnEditRuang" class="tab-btn" onclick="switchPanitiaTab('editRuang')">✏️ Edit Pembagian Ruang &amp; PIN Pengawas</button>
         <button type="button" id="pnTabBtnEditJadwal" class="tab-btn" onclick="switchPanitiaTab('editJadwal')">📅 Edit Jadwal &amp; Mata Pelajaran Assesmen</button>
+        <button type="button" id="pnTabBtnNomorMeja" class="tab-btn" onclick="switchPanitiaTab('nomorMeja')">🪑 Cetak Nomor Meja Assesmen</button>
+        <button type="button" id="pnTabBtnCetakHadir" class="tab-btn" onclick="switchPanitiaTab('cetakHadir')">🖨️ Cetak Daftar Hadir Resmi</button>
       </div>
 
       <!-- PANITIA TAB 1: REKAP KEHADIRAN LINTAS RUANG -->
@@ -1350,6 +1464,46 @@
               <tbody id="pnEditScheduleBody"></tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <!-- PANITIA TAB 5: CETAK NOMOR MEJA ASSESMEN (BARCODE QR + DATA SISWA) -->
+      <section id="pnTabNomorMeja" class="hidden">
+        <div class="card">
+          <div class="card-header no-print">
+            <div>
+              <h3>🪑 Cetak Nomor Meja Assesmen (Barcode QR &amp; Data Siswa)</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Ukuran kartu sama persis dengan Kartu Absensi Resmi (3 kolom cetak). Dilengkapi QR Code yang langsung terbaca oleh kamera Pengawas Assesmen.</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+              <select id="pnNomorMejaRoomSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderPanitiaNomorMeja()">
+                <option value="R.1">Ruang R.1</option>
+              </select>
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('schoolLogoUpload').click()">🖼️ Ganti Logo Sekolah</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Cetak Nomor Meja / PDF</button>
+            </div>
+          </div>
+          <div id="pnNomorMejaGrid" class="qr-grid"></div>
+        </div>
+      </section>
+
+      <!-- PANITIA TAB 6: CETAK DAFTAR HADIR RESMI ASSESMEN AKHIR SEMESTER GASAL -->
+      <section id="pnTabCetakHadir" class="hidden">
+        <div class="card">
+          <div class="card-header no-print">
+            <div>
+              <h3>🖨️ Cetak Daftar Hadir Peserta Assesmen Akhir Semester Gasal 2026/2027</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Hanya dapat diakses &amp; dicetak melalui akun Panitia Assesmen. Ruang, Hari/Tanggal, Sesi, dan Mata Pelajaran otomatis menyesuaikan pilihan.</p>
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+              <select id="pnCetakRoomSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderPanitiaCetakDaftarHadir()">
+                <option value="R.1">Ruang R.1</option>
+              </select>
+              <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">🖨️ Cetak Daftar Hadir / PDF</button>
+            </div>
+          </div>
+
+          <div id="pnOfficialAttendancePrintArea" class="official-sheet"></div>
         </div>
       </section>
     </div>
@@ -3329,6 +3483,7 @@
         appData.schoolLogo = ev.target.result;
         saveAppData();
         renderQrCards();
+        if (!document.getElementById('pnTabNomorMeja')?.classList.contains('hidden')) renderPanitiaNomorMeja();
         showToast('success', 'Logo Sekolah Diperbarui', 'Logo baru langsung diterapkan pada Kartu QR.');
       };
       reader.readAsDataURL(file);
@@ -3957,7 +4112,9 @@
         rekap: ['pnTabRekap', 'pnTabBtnRekap'],
         detail: ['pnTabDetail', 'pnTabBtnDetail'],
         editRuang: ['pnTabEditRuang', 'pnTabBtnEditRuang'],
-        editJadwal: ['pnTabEditJadwal', 'pnTabBtnEditJadwal']
+        editJadwal: ['pnTabEditJadwal', 'pnTabBtnEditJadwal'],
+        nomorMeja: ['pnTabNomorMeja', 'pnTabBtnNomorMeja'],
+        cetakHadir: ['pnTabCetakHadir', 'pnTabBtnCetakHadir']
       };
       Object.keys(map).forEach(k => {
         document.getElementById(map[k][0])?.classList.toggle('hidden', k !== tab);
@@ -3966,6 +4123,178 @@
       if (tab === 'detail') renderPanitiaDetailTable();
       if (tab === 'editRuang') renderPanitiaEditRoomsTable();
       if (tab === 'editJadwal') renderPanitiaEditScheduleTable();
+      if (tab === 'nomorMeja') renderPanitiaNomorMeja();
+      if (tab === 'cetakHadir') renderPanitiaCetakDaftarHadir();
+    }
+
+    function formatIndonesianDayDate(isoDate) {
+      if (!isoDate) return '-';
+      const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const parts = isoDate.split('-').map(Number);
+      if (parts.length !== 3) return isoDate;
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      return `${days[d.getDay()]}, ${String(parts[2]).padStart(2, '0')} ${months[parts[1] - 1]} ${parts[0]}`;
+    }
+
+    function renderPanitiaCetakDaftarHadir() {
+      ensureAsesmenDefaults();
+      const roomSel = document.getElementById('pnCetakRoomSelect');
+      const area = document.getElementById('pnOfficialAttendancePrintArea');
+      if (!roomSel || !area) return;
+
+      const curRoom = roomSel.value || 'R.1';
+      roomSel.innerHTML = appData.asesmenRooms.map(r => `<option value="${r.id}">Ruang ${r.name} (${r.kelas1}${r.kelas2 ? ' & ' + r.kelas2 : ''})</option>`).join('');
+      if ([...roomSel.options].some(o => o.value === curRoom)) roomSel.value = curRoom;
+
+      const chosenRoomId = roomSel.value;
+      const roomCfg = appData.asesmenRooms.find(r => r.id === chosenRoomId) || appData.asesmenRooms[0];
+      const dateStr = document.getElementById('pnDateInput')?.value || getTodayISO();
+      const sesiStr = document.getElementById('pnSesiSelect')?.value || 'Sesi 1';
+      const schedInfo = getAsesmenScheduleInfo(dateStr, sesiStr);
+      const dayDateText = schedInfo.found ? schedInfo.dayLabel : formatIndonesianDayDate(dateStr);
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[roomCfg.id] || {};
+      const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
+
+      let hadir = 0, sakit = 0, izin = 0, alpa = 0, belum = 0;
+      const rowsHtml = participants.map(p => {
+        const rec = attMap[p.studentId];
+        const st = rec ? rec.status : '';
+        if (st === 'Hadir') hadir++;
+        else if (st === 'Sakit') sakit++;
+        else if (st === 'Izin') izin++;
+        else if (st === 'Alpa') alpa++;
+        else belum++;
+
+        const seatCode = `${roomCfg.name}-${String(p.seatNo).padStart(2, '0')}`;
+        const ketText = st
+          ? (st === 'Hadir' ? `Hadir (${rec.time})` : st)
+          : 'Belum Absen';
+
+        return `
+          <tr>
+            <td style="text-align:center;">${p.seatNo}</td>
+            <td class="mono" style="text-align:center; font-weight:700;">${seatCode}</td>
+            <td class="mono" style="text-align:center;">${p.nisn || '-'}</td>
+            <td><strong>${p.name}</strong></td>
+            <td style="text-align:center;">${p.kelas} (No. ${p.classAbsenNo})</td>
+            <td style="text-align:center; font-weight:700;">${ketText}</td>
+            <td style="text-align:center; width:95px;">${st === 'Hadir' ? '✔' : ''}</td>
+          </tr>
+        `;
+      }).join('');
+
+      area.innerHTML = `
+        <div class="official-kop">
+          <img src="${logo}" alt="Logo SMPN 1 Tempuran" />
+          <div class="official-kop-text">
+            <div class="instansi">Pemerintah Kabupaten Magelang • Dinas Pendidikan dan Kebudayaan</div>
+            <div class="sekolah">SMP NEGERI 1 TEMPURAN</div>
+            <div class="alamat">Jl. Raya Magelang – Purworejo Km. 10, Tempuran, Kabupaten Magelang</div>
+          </div>
+        </div>
+
+        <div class="official-title-box">
+          <h4>DAFTAR HADIR PESERTA<br/>ASSESMEN AKHIR SEMESTER GASAL<br/>TAHUN PELAJARAN 2026/2027</h4>
+        </div>
+
+        <div class="official-meta-grid">
+          <div>
+            <div class="official-meta-row"><span class="lbl">Ruang Ujian</span><span class="val">: Ruang ${roomCfg.name}</span></div>
+            <div class="official-meta-row"><span class="lbl">Kelompok Kelas</span><span class="val">: ${roomCfg.kelas1} (No. ${roomCfg.start1}–${roomCfg.end1})${roomCfg.kelas2 ? ` &amp; ${roomCfg.kelas2} (No. ${roomCfg.start2}–${roomCfg.end2})` : ''}</span></div>
+            <div class="official-meta-row"><span class="lbl">Sesi / Waktu</span><span class="val">: ${sesiStr} (${schedInfo.time})</span></div>
+          </div>
+          <div>
+            <div class="official-meta-row"><span class="lbl">Hari / Tanggal</span><span class="val">: ${dayDateText}</span></div>
+            <div class="official-meta-row"><span class="lbl">Mata Pelajaran</span><span class="val">: ${schedInfo.mapel}</span></div>
+            <div class="official-meta-row"><span class="lbl">Jumlah Peserta</span><span class="val">: ${participants.length} Siswa</span></div>
+          </div>
+        </div>
+
+        <table class="official-table">
+          <thead>
+            <tr>
+              <th style="width:36px;">No.</th>
+              <th style="width:82px;">No. Peserta</th>
+              <th style="width:105px;">NISN</th>
+              <th>Nama Lengkap Siswa</th>
+              <th style="width:110px;">Kelas / Absen</th>
+              <th style="width:115px;">Keterangan</th>
+              <th style="width:95px;">Paraf / Scan</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || '<tr><td colspan="7" style="text-align:center; padding:1rem;">Belum ada data peserta pada ruang ini.</td></tr>'}
+          </tbody>
+        </table>
+
+        <div class="official-footer-sign">
+          <div class="official-rekap-box">
+            <div style="font-weight:800; border-bottom:1px solid #000; margin-bottom:4px; padding-bottom:2px;">REKAPITULASI KEHADIRAN</div>
+            <div><span>Jumlah Peserta Seharusnya</span><strong>: ${participants.length} orang</strong></div>
+            <div><span>Jumlah Peserta Hadir</span><strong>: ${hadir} orang</strong></div>
+            <div><span>Sakit / Izin</span><strong>: ${sakit + izin} orang</strong></div>
+            <div><span>Alpa / Belum Hadir</span><strong>: ${alpa + belum} orang</strong></div>
+          </div>
+
+          <div class="official-ttd-box">
+            <div>Tempuran, ${dayDateText.includes(',') ? dayDateText.split(',')[1].trim() : dayDateText}</div>
+            <div>Pengawas Ruang ${roomCfg.name} / Panitia Assesmen,</div>
+            <div style="height:54px;"></div>
+            <div style="font-weight:800;">( ................................................... )</div>
+            <div>NIP. ..............................................</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPanitiaNomorMeja() {
+      ensureAsesmenDefaults();
+      const sel = document.getElementById('pnNomorMejaRoomSelect');
+      const grid = document.getElementById('pnNomorMejaGrid');
+      if (!sel || !grid) return;
+
+      const cur = sel.value || 'R.1';
+      sel.innerHTML = `<option value="ALL">🏫 Semua Ruang (R.1 – R.${appData.asesmenRooms.length})</option>` +
+        appData.asesmenRooms.map(r => `<option value="${r.id}">Ruang ${r.name} (${r.kelas1}${r.kelas2 ? ' & ' + r.kelas2 : ''})</option>`).join('');
+      if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+
+      const chosen = sel.value;
+      const targetRooms = chosen === 'ALL' ? appData.asesmenRooms : appData.asesmenRooms.filter(r => r.id === chosen);
+      const logo = appData.schoolLogo || DEFAULT_SCHOOL_LOGO_SVG;
+
+      const cardsHtml = targetRooms.flatMap(r => {
+        const participants = getAsesmenRoomParticipants(r);
+        return participants.map(p => {
+          const seatCode = `${r.name}-${String(p.seatNo).padStart(2, '0')}`;
+          return `
+            <div class="id-card">
+              <div class="id-card-header">
+                <img src="${logo}" alt="Logo Sekolah" class="id-card-logo" />
+                <div class="id-card-school">
+                  <h4>SMP NEGERI 1 TEMPURAN</h4>
+                  <p>Kartu Nomor Meja Assesmen</p>
+                </div>
+              </div>
+              <div style="width:100%; background:#0b1d47; color:#fde047; border:1.5px solid #fbbf24; border-radius:8px; padding:0.28rem 0.5rem; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.72rem; font-weight:800; letter-spacing:0.03em;">RUANG ${r.name}</span>
+                <span class="mono" style="font-size:0.88rem; font-weight:900; color:#ffffff;">MEJA ${String(p.seatNo).padStart(2, '0')}</span>
+              </div>
+              <div class="id-card-qr">${generateIsoQrSvg(p.studentId)}</div>
+              <div class="id-card-meta">
+                <div><span class="lbl">Nama</span><span class="val">: ${p.name}</span></div>
+                <div><span class="lbl">Kelas</span><span class="val">: ${p.kelas} (No. ${p.classAbsenNo})</span></div>
+                <div><span class="lbl">NISN</span><span class="val">: ${p.nisn || '-'}</span></div>
+                <div><span class="lbl">Kode</span><span class="val mono">: ${p.studentId}</span></div>
+              </div>
+              <div class="id-card-footer">No. Peserta: ${seatCode} • Wajib Ditempel di Meja</div>
+            </div>
+          `;
+        });
+      }).join('');
+
+      grid.innerHTML = cardsHtml || `<p style="color:var(--text-muted); padding:1rem;">Belum ada data peserta pada ruang ini.</p>`;
     }
 
     function refreshPanitiaDashboard() {
@@ -4026,6 +4355,8 @@
       if (!document.getElementById('pnTabDetail').classList.contains('hidden')) renderPanitiaDetailTable();
       if (!document.getElementById('pnTabEditRuang').classList.contains('hidden')) renderPanitiaEditRoomsTable();
       if (!document.getElementById('pnTabEditJadwal').classList.contains('hidden')) renderPanitiaEditScheduleTable();
+      if (!document.getElementById('pnTabNomorMeja').classList.contains('hidden')) renderPanitiaNomorMeja();
+      if (!document.getElementById('pnTabCetakHadir').classList.contains('hidden')) renderPanitiaCetakDaftarHadir();
     }
 
     function openPanitiaRoomDetail(roomId) {
