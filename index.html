@@ -1950,11 +1950,15 @@
     payloadObj._updatedAt = Number(payloadObj._updatedAt || Date.now());
     const serialized = JSON.stringify(payloadObj);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: serialized
+      body: serialized,
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error('HTTP ' + res.status);
 
     lastCloudSnapshotHash = serialized;
@@ -1983,7 +1987,10 @@ async function pullStateFromAppsScript(notifyUser = false) {
   isSyncingFromCloud = true;
   try {
     const sep = url.includes('?') ? '&' : '?';
-    const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store' });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${url}${sep}_t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const incoming = await res.json();
 
@@ -3897,8 +3904,7 @@ async function pullStateFromAppsScript(notifyUser = false) {
         `Ruang;Sesi;Tanggal;Mata Pelajaran;No Duduk;Kelas;No Absen Kelas;Kode;NISN;Nama Siswa;Status;Waktu`,
         ...participants.map(p => `${roomId};${sesiStr};${dateStr};"${sched.mapel}";${p.seatNo};${p.kelas};${p.classAbsenNo};${p.studentId};${p.nisn || '-'};"${p.name}";${attMap[p.studentId]?.status || 'Belum Absen'};${attMap[p.studentId]?.time || '-'}`)
       ];
-      downloadTextFile(`Assesmen_${roomId}_${sesiStr.replace(/\s+/g,'')}_${dateStr}.csv`, '﻿' + lines.join('
-'), 'text/csv;charset=utf-8;');
+      downloadTextFile(`Assesmen_${roomId}_${sesiStr.replace(/\s+/g,'')}_${dateStr}.csv`, '\uFEFF' + lines.join('\n'), 'text/csv;charset=utf-8;');
     }
 
     /* =========================================================================
@@ -4056,8 +4062,7 @@ async function pullStateFromAppsScript(notifyUser = false) {
         });
       });
 
-      downloadTextFile(`Rekap_Assesmen_SemuaRuang_${sesiStr.replace(/\s+/g,'')}_${dateStr}.csv`, '﻿' + lines.join('
-'), 'text/csv;charset=utf-8;');
+      downloadTextFile(`Rekap_Assesmen_SemuaRuang_${sesiStr.replace(/\s+/g,'')}_${dateStr}.csv`, '\uFEFF' + lines.join('\n'), 'text/csv;charset=utf-8;');
     }
 
     /* MENU EDIT PEMBAGIAN RUANG ASSESMEN */
