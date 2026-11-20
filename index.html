@@ -1101,6 +1101,259 @@
       </div>
     </div>
 
+
+    <!-- ===================================================================
+         5. WORKSPACE PENGAWAS ASSESMEN (RUANG R.1 – R.21, SESI 1 & SESI 2)
+         =================================================================== -->
+    <div id="pengawasWorkspaceView" class="hidden">
+      <div class="hero-card">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:0.75rem;">
+          <div>
+            <span id="pgRoomBadge" class="badge badge-gold" style="margin-bottom:0.4rem;">📝 PENGAWAS RUANG R.1</span>
+            <h2 id="pgRoomTitle">Absensi Assesmen — Ruang R.1</h2>
+            <p id="pgRoomSub">Pembagian Peserta: Kelas 9A (No. 1-16) &amp; Kelas 7A (No. 1-16) • Total 32 Peserta</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <select id="pgRoomSelect" class="form-control" style="width:auto; font-weight:800;" onchange="refreshPengawasUI()"></select>
+            <input type="date" id="pgDateInput" class="form-control" style="width:auto;" onchange="onPengawasDateChange()" />
+            <select id="pgSesiSelect" class="form-control" style="width:auto; font-weight:800;" onchange="refreshPengawasUI()">
+              <option value="Sesi 1">⏰ Sesi 1 (Jam Ke-1)</option>
+              <option value="Sesi 2">⏰ Sesi 2 (Jam Ke-2)</option>
+              <option value="Sesi 3">⏰ Sesi 3 (Jam Ke-3 — Khusus Kamis)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:1rem; background:#fffbeb; border:1.5px solid #fcd34d;">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:0.65rem;">
+          <div>
+            <span style="font-size:0.76rem; font-weight:800; color:#92400e;">📅 JADWAL MATA PELAJARAN ASSESMEN AKTIF:</span>
+            <div id="pgActiveScheduleText" style="font-size:0.95rem; font-weight:900; color:#0b1d47; margin-top:2px;">
+              Senin, 30 November 2026 • Sesi 1 (07.15 - 09.15) — Bahasa Indonesia
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" onclick="openAsesmenScheduleModal()">✏️ Edit Jadwal Assesmen</button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h3>📷 Scan QR / Input Kode Peserta Assesmen</h3>
+            <span id="pgSesiBadge" class="badge badge-teal">Sesi 1</span>
+          </div>
+
+          <div class="scanner-box" style="margin-bottom:0.85rem;">
+            <video id="pgVideo" class="hidden" playsinline muted></video>
+            <div id="pgOverlay" class="scanner-overlay hidden"></div>
+            <p id="pgCamPlaceholder" style="color:#cbd5e1; font-size:0.82rem; text-align:center; padding:1rem;">
+              Kamera pemindai peserta assesmen belum aktif.<br/>Klik tombol di bawah atau ketik Kode QR / NISN / Nama peserta.
+            </p>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-bottom:0.85rem; flex-wrap:wrap;">
+            <button type="button" id="btnStartPgCam" class="btn btn-primary" onclick="startQrCamera('pg')">📷 Mulai Scan Kartu</button>
+            <button type="button" id="btnStopPgCam" class="btn btn-danger hidden" onclick="stopAllCameras()">⏹ Matikan Kamera</button>
+          </div>
+
+          <form onsubmit="handlePengawasManualScan(event)" style="display:flex; gap:0.5rem;">
+            <input type="text" id="pgCodeInput" class="form-control mono" placeholder="Ketik Kode QR / NISN / Nama peserta..." style="text-transform:uppercase;" />
+            <button type="submit" class="btn btn-success">Hadir</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 Daftar Hadir Peserta Ruang Ini</h3>
+            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+              <button type="button" class="btn btn-success btn-sm" onclick="markAllPengawasPresent()">✅ Hadirkan Semua</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="exportPengawasRoomCSV()">📥 CSV Ruang</button>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.4rem;">
+            <span id="pgSummaryBadge" class="badge badge-success">Hadir: 0 / 32 Peserta</span>
+            <span style="font-size:0.74rem; color:var(--text-muted);">No. Absen sesuai urutan nama siswa di kelas induk</span>
+          </div>
+          <div class="table-wrap" style="max-height:400px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>No.Duduk</th>
+                  <th>Kelas &amp; No.Absen</th>
+                  <th>Nama Siswa &amp; Kode</th>
+                  <th>Status</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="pgParticipantsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         6. WORKSPACE PANITIA ASSESMEN (REKAP LINTAS RUANG + MENU EDIT PEMBAGIAN & JADWAL)
+         =================================================================== -->
+    <div id="panitiaWorkspaceView" class="hidden">
+      <div class="hero-card">
+        <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:0.75rem;">
+          <div>
+            <span class="badge badge-gold" style="margin-bottom:0.4rem;">🏛️ PANITIA ASSESMEN SEKOLAH</span>
+            <h2>Rekap Kehadiran, Pengaturan Ruang &amp; Jadwal Assesmen</h2>
+            <p>Menerima rekap kehadiran seluruh ruang (R.1 – R.21) per Sesi 1, Sesi 2, &amp; Sesi 3 secara real-time, serta mengatur pembagian ruang dan jadwal ujian.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+            <input type="date" id="pnDateInput" class="form-control" style="width:auto;" onchange="refreshPanitiaDashboard()" />
+            <select id="pnSesiSelect" class="form-control" style="width:auto; font-weight:800;" onchange="refreshPanitiaDashboard()">
+              <option value="Sesi 1">⏰ Sesi 1 (Jam Ke-1)</option>
+              <option value="Sesi 2">⏰ Sesi 2 (Jam Ke-2)</option>
+              <option value="Sesi 3">⏰ Sesi 3 (Jam Ke-3 — Kamis)</option>
+            </select>
+            <button type="button" class="btn btn-success btn-sm" onclick="exportPanitiaAllRoomsCSV()">📥 Export Rekap Semua Ruang CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-nav">
+        <button type="button" id="pnTabBtnRekap" class="tab-btn active" onclick="switchPanitiaTab('rekap')">📊 Rekap Kehadiran Per Ruang (R.1–R.21)</button>
+        <button type="button" id="pnTabBtnDetail" class="tab-btn" onclick="switchPanitiaTab('detail')">👥 Detail Peserta &amp; Belum Hadir</button>
+        <button type="button" id="pnTabBtnEditRuang" class="tab-btn" onclick="switchPanitiaTab('editRuang')">✏️ Edit Pembagian Ruang &amp; PIN Pengawas</button>
+        <button type="button" id="pnTabBtnEditJadwal" class="tab-btn" onclick="switchPanitiaTab('editJadwal')">📅 Edit Jadwal &amp; Mata Pelajaran Assesmen</button>
+      </div>
+
+      <!-- PANITIA TAB 1: REKAP KEHADIRAN LINTAS RUANG -->
+      <section id="pnTabRekap">
+        <div class="stats-grid" id="pnStatsGrid" style="margin-bottom:1rem;"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>📊 Rekapitulasi Kehadiran Assesmen Lintas Ruang (R.1 – R.21)</h3>
+              <p id="pnScheduleSummaryText" style="font-size:0.78rem; color:var(--text-muted);">Jadwal aktif...</p>
+            </div>
+            <span class="badge badge-info">Otomatis Terhubung dengan Akun Pengawas</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ruang</th>
+                  <th>Kelompok Kelas 1</th>
+                  <th>Kelompok Kelas 2</th>
+                  <th>Total Peserta</th>
+                  <th>Hadir</th>
+                  <th>Sakit / Izin</th>
+                  <th>Belum / Alpa</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="pnRoomsSummaryBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANITIA TAB 2: DETAIL PESERTA PER RUANG -->
+      <section id="pnTabDetail" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>👥 Daftar Rincian Kehadiran Peserta per Ruang</h3>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <select id="pnDetailRoomSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderPanitiaDetailTable()"></select>
+              <select id="pnDetailStatusFilter" class="form-control" style="width:auto;" onchange="renderPanitiaDetailTable()">
+                <option value="ALL">Semua Status</option>
+                <option value="BELUM">⚠️ Belum Hadir / Alpa</option>
+                <option value="HADIR">✅ Hadir</option>
+                <option value="IZIN">📩 Sakit / Izin</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>No.Duduk</th>
+                  <th>Ruang</th>
+                  <th>Kelas &amp; No.Absen</th>
+                  <th>Kode QR &amp; NISN</th>
+                  <th>Nama Siswa</th>
+                  <th>Status Sesi Aktif</th>
+                  <th>Koreksi Cepat</th>
+                </tr>
+              </thead>
+              <tbody id="pnDetailTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANITIA TAB 3: EDIT PEMBAGIAN RUANG ASSESMEN -->
+      <section id="pnTabEditRuang" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>✏️ Edit Pembagian Ruang Assesmen (R.1 – R.21)</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Sesuaikan kelas, rentang nomor absen (urutan nama siswa sesuai kelas induk), maupun PIN login pengawas ruang.</p>
+            </div>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="openEditAsesmenRoomModal('NEW')">+ Tambah Ruang Baru</button>
+              <button type="button" class="btn btn-warning btn-sm" onclick="resetDefaultAsesmenRooms()">🔄 Reset ke Tabel Default (R.1–R.21)</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ruang</th>
+                  <th>Kelas 1</th>
+                  <th>No. Absen 1</th>
+                  <th>Kelas 2</th>
+                  <th>No. Absen 2</th>
+                  <th>Total Murid</th>
+                  <th>PIN Pengawas</th>
+                  <th>Edit</th>
+                </tr>
+              </thead>
+              <tbody id="pnEditRoomsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANITIA TAB 4: EDIT JADWAL ASSESMEN -->
+      <section id="pnTabEditJadwal" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>📅 Edit Jadwal &amp; Mata Pelajaran Assesmen (Sesi 1, Sesi 2, &amp; Sesi 3)</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted);">Jadwal default sudah diisi sesuai jadwal 30 November – 04 Desember 2026. Klik Edit pada hari mana saja untuk mengubah tanggal, jam, atau mata pelajaran.</p>
+            </div>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" onclick="openEditScheduleDayModal('NEW')">+ Tambah Hari Ujian</button>
+              <button type="button" class="btn btn-warning btn-sm" onclick="resetDefaultAsesmenSchedules()">🔄 Reset ke Jadwal Default</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Hari &amp; Tanggal</th>
+                  <th>Sesi 1 (Jam Ke-1)</th>
+                  <th>Sesi 2 (Jam Ke-2)</th>
+                  <th>Sesi 3 (Opsional / Kamis)</th>
+                  <th>Edit</th>
+                </tr>
+              </thead>
+              <tbody id="pnEditScheduleBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
   </main>
 
   <!-- MODAL LOGIN -->
@@ -1119,6 +1372,8 @@
               <option value="guru_wali">🕌 Guru Wali — Khusus Absen Sholat Dzuhur (PIN: 4040)</option>
               <option value="wali_kelas">👩‍🏫 Wali Kelas VIIA–IXG (PIN: 2026)</option>
               <option value="guru_bk">🧑‍⚕️ Guru BK Jenjang VII / VIII / IX (PIN: 3030)</option>
+              <option value="pengawas">📝 Pengawas Assesmen Ruang R.1–R.21 (PIN: 5050)</option>
+              <option value="panitia">🏛️ Panitia Assesmen Sekolah (PIN: 6060)</option>
               <option value="admin">🛡️ Admin Sekolah (PIN: 9999)</option>
             </select>
           </div>
@@ -1140,6 +1395,11 @@
               <option value="VIII">Guru BK Kelas VIII (VIIIA – VIIIG)</option>
               <option value="IX">Guru BK Kelas IX (IXA – IXG)</option>
             </select>
+          </div>
+
+          <div class="form-group hidden" id="loginPengawasRoomGroup">
+            <label for="loginPengawasRoomSelect">Pilih Ruang Pengawasan Assesmen *</label>
+            <select id="loginPengawasRoomSelect" class="form-control"></select>
           </div>
 
           <div class="form-group">
@@ -1232,6 +1492,120 @@
           </div>
           <p id="pagiPinErrorMsg" class="hidden" style="color:var(--danger); font-size:0.8rem; font-weight:700; margin-bottom:0.75rem;"></p>
           <button type="submit" class="btn btn-primary" style="width:100%;">🔓 Buka Absen Pagi</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT PEMBAGIAN RUANG ASSESMEN -->
+  <div id="editAsesmenRoomModal" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-head">
+        <h3 id="editAsesmenRoomTitle">✏️ Edit Pembagian Ruang Assesmen</h3>
+        <button type="button" class="btn btn-danger btn-xs" onclick="closeModal('editAsesmenRoomModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="saveAsesmenRoomForm(event)">
+          <input type="hidden" id="editArOriginalId" />
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;">
+            <div class="form-group">
+              <label>Nama Ruang *</label>
+              <input type="text" id="editArName" class="form-control mono" placeholder="Contoh: R.1" required />
+            </div>
+            <div class="form-group">
+              <label>PIN Pengawas Ruang *</label>
+              <input type="text" id="editArPin" class="form-control mono" placeholder="5050" maxlength="8" required />
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.75rem; margin-bottom:0.75rem;">
+            <div style="font-size:0.78rem; font-weight:800; color:#0b1d47; margin-bottom:0.5rem;">KELOMPOK KELAS 1</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Kelas 1</label>
+                <select id="editArKelas1" class="form-control"></select>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>No. Absen Mulai</label>
+                <input type="number" id="editArStart1" class="form-control" min="1" max="60" value="1" required />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>No. Absen Akhir</label>
+                <input type="number" id="editArEnd1" class="form-control" min="1" max="60" value="16" required />
+              </div>
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.75rem; margin-bottom:0.85rem;">
+            <div style="font-size:0.78rem; font-weight:800; color:#0b1d47; margin-bottom:0.5rem;">KELOMPOK KELAS 2 (Opsional)</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Kelas 2</label>
+                <select id="editArKelas2" class="form-control"></select>
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>No. Absen Mulai</label>
+                <input type="number" id="editArStart2" class="form-control" min="0" max="60" value="1" />
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>No. Absen Akhir</label>
+                <input type="number" id="editArEnd2" class="form-control" min="0" max="60" value="16" />
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;">💾 Simpan Pembagian Ruang</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT JADWAL ASSESMEN -->
+  <div id="editAsesmenScheduleModal" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width:520px;">
+      <div class="modal-head">
+        <h3 id="editAsesmenSchedTitle">📅 Edit Jadwal Assesmen</h3>
+        <button type="button" class="btn btn-danger btn-xs" onclick="closeModal('editAsesmenScheduleModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="saveAsesmenScheduleForm(event)">
+          <input type="hidden" id="editSchedIndex" />
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.65rem;">
+            <div class="form-group">
+              <label>Tanggal Ujian *</label>
+              <input type="date" id="editSchedDate" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label>Label Hari &amp; Tanggal *</label>
+              <input type="text" id="editSchedDayLabel" class="form-control" placeholder="Senin, 30 November 2026" required />
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.75rem; margin-bottom:0.65rem;">
+            <div style="font-size:0.78rem; font-weight:800; color:#0b1d47; margin-bottom:0.4rem;">SESI 1 (JAM KE-1)</div>
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:0.5rem;">
+              <input type="text" id="editSchedSesi1Time" class="form-control mono" placeholder="07.15 - 09.15" required />
+              <input type="text" id="editSchedSesi1Mapel" class="form-control" placeholder="Bahasa Indonesia" required />
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.75rem; margin-bottom:0.65rem;">
+            <div style="font-size:0.78rem; font-weight:800; color:#0b1d47; margin-bottom:0.4rem;">SESI 2 (JAM KE-2)</div>
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:0.5rem;">
+              <input type="text" id="editSchedSesi2Time" class="form-control mono" placeholder="10.30 - 12.00" required />
+              <input type="text" id="editSchedSesi2Mapel" class="form-control" placeholder="Pendidikan Agama dan Budi Pekerti" required />
+            </div>
+          </div>
+
+          <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:0.75rem; margin-bottom:0.85rem;">
+            <div style="font-size:0.78rem; font-weight:800; color:#0b1d47; margin-bottom:0.4rem;">SESI 3 (JAM KE-3 — OPSIONAL / KHUSUS KAMIS)</div>
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:0.5rem;">
+              <input type="text" id="editSchedSesi3Time" class="form-control mono" placeholder="11.45 - 13.15" />
+              <input type="text" id="editSchedSesi3Mapel" class="form-control" placeholder="Kosongkan jika hanya 2 sesi" />
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%;">💾 Simpan Jadwal Assesmen</button>
         </form>
       </div>
     </div>
@@ -1336,6 +1710,81 @@
       return hay.includes('agama') || hay.includes('pai');
     }
 
+
+    const DEFAULT_ASESMEN_ROOMS = [
+      { id: 'R.1',  name: 'R.1',  kelas1: 'IXA',   start1: 1,  end1: 16, kelas2: 'VIIA',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.2',  name: 'R.2',  kelas1: 'IXB',   start1: 1,  end1: 16, kelas2: 'VIIB',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.3',  name: 'R.3',  kelas1: 'IXC',   start1: 1,  end1: 16, kelas2: 'VIIC',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.4',  name: 'R.4',  kelas1: 'IXD',   start1: 1,  end1: 16, kelas2: 'VIID',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.5',  name: 'R.5',  kelas1: 'IXE',   start1: 1,  end1: 16, kelas2: 'VIIE',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.6',  name: 'R.6',  kelas1: 'IXF',   start1: 1,  end1: 16, kelas2: 'VIIF',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.7',  name: 'R.7',  kelas1: 'IXG',   start1: 1,  end1: 16, kelas2: 'VIIG',  start2: 1,  end2: 16, pin: '5050' },
+      { id: 'R.8',  name: 'R.8',  kelas1: 'VIIIA', start1: 1,  end1: 16, kelas2: 'VIIA',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.9',  name: 'R.9',  kelas1: 'VIIIB', start1: 1,  end1: 16, kelas2: 'VIIB',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.10', name: 'R.10', kelas1: 'VIIIC', start1: 1,  end1: 16, kelas2: 'VIIC',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.11', name: 'R.11', kelas1: 'VIIID', start1: 1,  end1: 16, kelas2: 'VIID',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.12', name: 'R.12', kelas1: 'VIIIE', start1: 1,  end1: 16, kelas2: 'VIIE',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.13', name: 'R.13', kelas1: 'VIIIF', start1: 1,  end1: 16, kelas2: 'VIIF',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.14', name: 'R.14', kelas1: 'VIIIG', start1: 1,  end1: 16, kelas2: 'VIIG',  start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.15', name: 'R.15', kelas1: 'IXA',   start1: 17, end1: 32, kelas2: 'VIIIA', start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.16', name: 'R.16', kelas1: 'IXB',   start1: 17, end1: 33, kelas2: 'VIIIB', start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.17', name: 'R.17', kelas1: 'IXC',   start1: 17, end1: 32, kelas2: 'VIIIC', start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.18', name: 'R.18', kelas1: 'IXD',   start1: 17, end1: 32, kelas2: 'VIIID', start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.19', name: 'R.19', kelas1: 'IXE',   start1: 17, end1: 32, kelas2: 'VIIIE', start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.20', name: 'R.20', kelas1: 'IXF',   start1: 17, end1: 32, kelas2: 'VIIIF', start2: 17, end2: 32, pin: '5050' },
+      { id: 'R.21', name: 'R.21', kelas1: 'IXG',   start1: 17, end1: 32, kelas2: 'VIIIG', start2: 17, end2: 30, pin: '5050' }
+    ];
+
+    const DEFAULT_ASESMEN_SCHEDULES = [
+      {
+        date: '2026-11-30',
+        dayLabel: 'Senin, 30 November 2026',
+        sesi1: { time: '07.15 - 09.15', mapel: 'Bahasa Indonesia' },
+        sesi2: { time: '10.30 - 12.00', mapel: 'Pendidikan Agama dan Budi Pekerti' },
+        sesi3: { time: '', mapel: '' }
+      },
+      {
+        date: '2026-12-01',
+        dayLabel: 'Selasa, 01 Desember 2026',
+        sesi1: { time: '07.15 - 09.15', mapel: 'Matematika' },
+        sesi2: { time: '10.30 - 12.00', mapel: 'Pendidikan Pancasila' },
+        sesi3: { time: '', mapel: '' }
+      },
+      {
+        date: '2026-12-02',
+        dayLabel: 'Rabu, 02 Desember 2026',
+        sesi1: { time: '07.15 - 09.15', mapel: 'Bahasa Inggris' },
+        sesi2: { time: '10.30 - 12.00', mapel: 'IPS' },
+        sesi3: { time: '', mapel: '' }
+      },
+      {
+        date: '2026-12-03',
+        dayLabel: 'Kamis, 03 Desember 2026',
+        sesi1: { time: '07.15 - 09.15', mapel: 'IPA' },
+        sesi2: { time: '10.00 - 11.30', mapel: 'Bahasa Jawa' },
+        sesi3: { time: '11.45 - 13.15', mapel: 'Informatika' }
+      },
+      {
+        date: '2026-12-04',
+        dayLabel: 'Jumat, 04 Desember 2026',
+        sesi1: { time: '07.15 - 08.45', mapel: 'PJOK' },
+        sesi2: { time: '09.45 - 11.15', mapel: 'Prakarya (7A-D, 8A-G, 9A-D) / Seni Rupa (7 EFG)' },
+        sesi3: { time: '', mapel: '' }
+      }
+    ];
+
+    function ensureAsesmenDefaults() {
+      if (!appData) return;
+      if (!appData.panitiaPin) appData.panitiaPin = '6060';
+      if (!Array.isArray(appData.asesmenRooms) || appData.asesmenRooms.length === 0) {
+        appData.asesmenRooms = JSON.parse(JSON.stringify(DEFAULT_ASESMEN_ROOMS));
+      }
+      if (!Array.isArray(appData.asesmenSchedules) || appData.asesmenSchedules.length === 0) {
+        appData.asesmenSchedules = JSON.parse(JSON.stringify(DEFAULT_ASESMEN_SCHEDULES));
+      }
+      if (!appData.asesmenAttendance) appData.asesmenAttendance = {};
+    }
+
     let appData = null;
     let currentSession = { role: 'public', roomId: 'mapel_mtk' };
     let activeCameraStream = null;
@@ -1428,6 +1877,7 @@
         };
         saveAppData(true);
       }
+      ensureAsesmenDefaults();
       syncAllClassesToAllMapelRooms(true);
     }
 
@@ -1462,6 +1912,10 @@
         refreshGuruWaliUI();
       } else if (currentSession.role === 'wali_kelas' || currentSession.role === 'guru_bk') {
         refreshHomeroomDashboard();
+      } else if (currentSession.role === 'pengawas') {
+        refreshPengawasUI();
+      } else if (currentSession.role === 'panitia') {
+        refreshPanitiaDashboard();
       } else {
         populateWsRoomAndClassFilters();
         refreshWorkspaceUI();
@@ -1556,6 +2010,7 @@ async function pullStateFromAppsScript(notifyUser = false) {
       hasUnsyncedLocalChanges = false;
       appData = incoming;
       delete appData._isFreshDefault;
+      ensureAsesmenDefaults();
       localStorage.setItem(STORAGE_KEY, trimmed);
       rerenderActiveRoleView();
     }
@@ -1651,7 +2106,8 @@ async function pullStateFromAppsScript(notifyUser = false) {
         pagi: { video: 'pagiVideo', overlay: 'pagiOverlay', ph: 'pagiCamPlaceholder', start: 'btnStartPagiCam', stop: 'btnStopPagiCam' },
         ws: { video: 'wsVideo', overlay: 'wsOverlay', ph: 'wsCamPlaceholder', start: 'btnStartWsCam', stop: 'btnStopWsCam' },
         sholat: { video: 'sholatVideo', overlay: 'sholatOverlay', ph: 'sholatCamPlaceholder', start: 'btnStartSholatCam', stop: 'btnStopSholatCam' },
-        gw: { video: 'gwVideo', overlay: 'gwOverlay', ph: 'gwCamPlaceholder', start: 'btnStartGwCam', stop: 'btnStopGwCam' }
+        gw: { video: 'gwVideo', overlay: 'gwOverlay', ph: 'gwCamPlaceholder', start: 'btnStartGwCam', stop: 'btnStopGwCam' },
+        pg: { video: 'pgVideo', overlay: 'pgOverlay', ph: 'pgCamPlaceholder', start: 'btnStartPgCam', stop: 'btnStopPgCam' }
       };
 
       const cfg = map[mode];
@@ -1724,6 +2180,7 @@ async function pullStateFromAppsScript(notifyUser = false) {
               else if (mode === 'ws') processWsScan(detectedCode);
               else if (mode === 'sholat') processWsSholatScan(detectedCode);
               else if (mode === 'gw') processGuruWaliScan(detectedCode);
+              else if (mode === 'pg') processPengawasScan(detectedCode);
             }
           }
         }, 320);
@@ -1746,7 +2203,7 @@ async function pullStateFromAppsScript(notifyUser = false) {
         izinStream = null;
       }
 
-      ['pagi', 'ws', 'sholat', 'gw'].forEach(m => {
+      ['pagi', 'ws', 'sholat', 'gw', 'pg'].forEach(m => {
         const cap = m.charAt(0).toUpperCase() + m.slice(1);
         const v = document.getElementById(`${m}Video`);
         if (v) { v.srcObject = null; v.classList.add('hidden'); }
@@ -2027,6 +2484,11 @@ async function pullStateFromAppsScript(notifyUser = false) {
       if (waliSel) {
         waliSel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c] || c}</option>`).join('');
       }
+      ensureAsesmenDefaults();
+      const pgSel = document.getElementById('loginPengawasRoomSelect');
+      if (pgSel) {
+        pgSel.innerHTML = appData.asesmenRooms.map(r => `<option value="${r.id}">${r.name} — ${r.kelas1} (${r.start1}-${r.end1})${r.kelas2 ? ` & ${r.kelas2} (${r.start2}-${r.end2})` : ''}</option>`).join('');
+      }
       document.getElementById('loginPinInput').value = '';
       document.getElementById('loginErrorMsg').classList.add('hidden');
       handleLoginRoleChange();
@@ -2042,6 +2504,7 @@ async function pullStateFromAppsScript(notifyUser = false) {
       document.getElementById('loginRoomGroup').classList.toggle('hidden', role !== 'guru');
       document.getElementById('loginWaliClassGroup').classList.toggle('hidden', role !== 'wali_kelas');
       document.getElementById('loginBkLevelGroup').classList.toggle('hidden', role !== 'guru_bk');
+      document.getElementById('loginPengawasRoomGroup').classList.toggle('hidden', role !== 'pengawas');
     }
 
     function handleLoginSubmit(e) {
@@ -2084,6 +2547,26 @@ async function pullStateFromAppsScript(notifyUser = false) {
           return;
         }
         currentSession = { role: 'guru_bk', level };
+      } else if (role === 'pengawas') {
+        ensureAsesmenDefaults();
+        const rId = document.getElementById('loginPengawasRoomSelect').value;
+        const aRoom = appData.asesmenRooms.find(r => r.id === rId);
+        const validPin = String((aRoom && aRoom.pin) || '5050');
+        if (!aRoom || (pin !== validPin && pin !== String(appData.panitiaPin || '6060') && pin !== String(appData.adminPin || '9999'))) {
+          errEl.textContent = `PIN Pengawas Ruang ${rId} salah (Default: ${validPin}).`;
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'pengawas', asesmenRoomId: aRoom.id };
+      } else if (role === 'panitia') {
+        ensureAsesmenDefaults();
+        const validPanitiaPin = String(appData.panitiaPin || '6060');
+        if (pin !== validPanitiaPin && pin !== String(appData.adminPin || '9999')) {
+          errEl.textContent = `PIN Panitia Assesmen salah (Default: ${validPanitiaPin}).`;
+          errEl.classList.remove('hidden');
+          return;
+        }
+        currentSession = { role: 'panitia' };
       } else if (role === 'admin') {
         if (pin !== String(appData.adminPin || '9999')) {
           errEl.textContent = 'PIN Admin Sekolah salah (Default: 9999).';
@@ -2116,6 +2599,8 @@ async function pullStateFromAppsScript(notifyUser = false) {
       document.getElementById('teacherWorkspaceView').classList.toggle('hidden', role !== 'guru' && role !== 'admin');
       document.getElementById('guruWaliWorkspaceView').classList.toggle('hidden', role !== 'guru_wali');
       document.getElementById('homeroomDashboardView').classList.toggle('hidden', role !== 'wali_kelas' && role !== 'guru_bk');
+      document.getElementById('pengawasWorkspaceView').classList.toggle('hidden', role !== 'pengawas');
+      document.getElementById('panitiaWorkspaceView').classList.toggle('hidden', role !== 'panitia');
 
       document.getElementById('btnOpenLogin').classList.toggle('hidden', role !== 'public');
       document.getElementById('btnLogout').classList.toggle('hidden', role === 'public');
@@ -2150,6 +2635,16 @@ async function pullStateFromAppsScript(notifyUser = false) {
         roleBadge.className = 'role-pill pill-homeroom';
         sub.textContent = 'Dashboard Pemantauan Terpadu Kehadiran Siswa';
         initHomeroomDashboard();
+      } else if (role === 'pengawas') {
+        roleBadge.textContent = `📝 Pengawas ${currentSession.asesmenRoomId || 'R.1'}`;
+        roleBadge.className = 'role-pill pill-teacher';
+        sub.textContent = 'Pengawasan & Presensi Assesmen per Ruang & Sesi';
+        initPengawasView();
+      } else if (role === 'panitia') {
+        roleBadge.textContent = '🏛️ Panitia Assesmen';
+        roleBadge.className = 'role-pill pill-admin';
+        sub.textContent = 'Rekapitulasi Kehadiran, Pembagian Ruang & Jadwal Assesmen';
+        initPanitiaView();
       }
     }
 
@@ -3161,6 +3656,619 @@ async function pullStateFromAppsScript(notifyUser = false) {
       };
       reader.readAsText(file);
       e.target.value = '';
+    }
+
+
+    /* =========================================================================
+       LOGIKA ASSESMEN: PEMBAGIAN RUANG R.1–R.21, NO ABSEN URUTAN NAMA KELAS,
+       SESI 1 / SESI 2 / SESI 3, PENGAWAS & PANITIA ASSESMEN
+       ========================================================================= */
+    function getAsesmenRoomParticipants(roomCfg) {
+      if (!roomCfg || !appData || !appData.masterStudents) return [];
+      const participants = [];
+      let seatNo = 1;
+
+      const addGroup = (clsCode, startNo, endNo) => {
+        const normCls = normalizeClassCode(clsCode);
+        if (!normCls || !ALL_CLASSES.includes(normCls)) return;
+        const sIdx = Math.max(1, parseInt(startNo, 10) || 1);
+        const eIdx = Math.max(sIdx, parseInt(endNo, 10) || sIdx);
+        const classStudents = appData.masterStudents[normCls] || [];
+        for (let absenNo = sIdx; absenNo <= eIdx; absenNo++) {
+          const st = classStudents[absenNo - 1];
+          if (st) {
+            participants.push({
+              seatNo: seatNo++,
+              classAbsenNo: absenNo,
+              studentId: st.id,
+              nisn: st.nisn || '',
+              name: st.name,
+              kelas: normCls,
+              roomId: roomCfg.id
+            });
+          }
+        }
+      };
+
+      addGroup(roomCfg.kelas1, roomCfg.start1, roomCfg.end1);
+      if (roomCfg.kelas2 && Number(roomCfg.end2) > 0) {
+        addGroup(roomCfg.kelas2, roomCfg.start2, roomCfg.end2);
+      }
+      return participants;
+    }
+
+    function getAsesmenScheduleInfo(dateStr, sesiStr) {
+      ensureAsesmenDefaults();
+      const sched = appData.asesmenSchedules.find(s => s.date === dateStr);
+      if (!sched) {
+        return {
+          found: false,
+          dayLabel: dateStr,
+          time: sesiStr === 'Sesi 1' ? '07.15 - 09.15' : sesiStr === 'Sesi 2' ? '10.30 - 12.00' : '11.45 - 13.15',
+          mapel: 'Mata Pelajaran Sesuai Jadwal'
+        };
+      }
+      const slot = sesiStr === 'Sesi 1' ? sched.sesi1 : sesiStr === 'Sesi 2' ? sched.sesi2 : sched.sesi3;
+      return {
+        found: true,
+        dayLabel: sched.dayLabel,
+        time: (slot && slot.time) || '-',
+        mapel: (slot && slot.mapel) || '(Tidak ada jadwal pada sesi ini)'
+      };
+    }
+
+    function updatePengawasSesiDropdown(dateStr) {
+      const sesiSel = document.getElementById('pgSesiSelect');
+      if (!sesiSel) return;
+      const cur = sesiSel.value || 'Sesi 1';
+      const s1 = getAsesmenScheduleInfo(dateStr, 'Sesi 1');
+      const s2 = getAsesmenScheduleInfo(dateStr, 'Sesi 2');
+      const s3 = getAsesmenScheduleInfo(dateStr, 'Sesi 3');
+
+      let opts = `
+        <option value="Sesi 1">⏰ Sesi 1 (${s1.time}) — ${s1.mapel}</option>
+        <option value="Sesi 2">⏰ Sesi 2 (${s2.time}) — ${s2.mapel}</option>
+      `;
+      if (s3.mapel && s3.mapel !== '(Tidak ada jadwal pada sesi ini)') {
+        opts += `<option value="Sesi 3">⏰ Sesi 3 (${s3.time}) — ${s3.mapel}</option>`;
+      }
+      sesiSel.innerHTML = opts;
+      if ([...sesiSel.options].some(o => o.value === cur)) sesiSel.value = cur;
+    }
+
+    function initPengawasView() {
+      ensureAsesmenDefaults();
+      const roomSel = document.getElementById('pgRoomSelect');
+      if (roomSel) {
+        roomSel.innerHTML = appData.asesmenRooms.map(r => `<option value="${r.id}" ${r.id === currentSession.asesmenRoomId ? 'selected' : ''}>Ruang ${r.name}</option>`).join('');
+      }
+      const dInp = document.getElementById('pgDateInput');
+      if (dInp && !dInp.value) {
+        const today = getTodayISO();
+        const hasToday = appData.asesmenSchedules.some(s => s.date === today);
+        dInp.value = hasToday ? today : (appData.asesmenSchedules[0]?.date || today);
+      }
+      updatePengawasSesiDropdown(dInp.value);
+      refreshPengawasUI();
+    }
+
+    function onPengawasDateChange() {
+      const dInp = document.getElementById('pgDateInput');
+      updatePengawasSesiDropdown(dInp.value);
+      refreshPengawasUI();
+    }
+
+    function refreshPengawasUI() {
+      ensureAsesmenDefaults();
+      const roomSel = document.getElementById('pgRoomSelect');
+      const roomId = roomSel ? roomSel.value : (currentSession.asesmenRoomId || 'R.1');
+      currentSession.asesmenRoomId = roomId;
+
+      const roomCfg = appData.asesmenRooms.find(r => r.id === roomId) || appData.asesmenRooms[0];
+      const dateStr = document.getElementById('pgDateInput')?.value || getTodayISO();
+      const sesiStr = document.getElementById('pgSesiSelect')?.value || 'Sesi 1';
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      const schedInfo = getAsesmenScheduleInfo(dateStr, sesiStr);
+
+      document.getElementById('roleBadge').textContent = `📝 Pengawas ${roomCfg.name}`;
+      document.getElementById('pgRoomBadge').textContent = `📝 PENGAWAS RUANG ${roomCfg.name}`;
+      document.getElementById('pgRoomTitle').textContent = `Absensi Assesmen — Ruang ${roomCfg.name}`;
+      document.getElementById('pgRoomSub').textContent = `Pembagian Peserta: ${roomCfg.kelas1} (No. ${roomCfg.start1}–${roomCfg.end1})${roomCfg.kelas2 ? ` & ${roomCfg.kelas2} (No. ${roomCfg.start2}–${roomCfg.end2})` : ''} • Total ${participants.length} Peserta`;
+      document.getElementById('pgSesiBadge').textContent = `${sesiStr} (${schedInfo.time})`;
+      document.getElementById('pgActiveScheduleText').textContent = `${schedInfo.dayLabel} • ${sesiStr} (${schedInfo.time}) — ${schedInfo.mapel}`;
+
+      const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[roomCfg.id] || {};
+      let hadirCount = 0;
+      participants.forEach(p => { if (attMap[p.studentId]?.status === 'Hadir') hadirCount++; });
+      document.getElementById('pgSummaryBadge').textContent = `Hadir: ${hadirCount} / ${participants.length} Peserta`;
+
+      const tbody = document.getElementById('pgParticipantsTableBody');
+      if (!tbody) return;
+      if (participants.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:1rem; color:var(--text-muted);">Belum ada siswa pada rentang nomor absen ruang ini. Periksa Bank Data Siswa di Admin.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = participants.map(p => {
+        const rec = attMap[p.studentId];
+        const statusHtml = rec
+          ? `<span class="badge ${rec.status === 'Hadir' ? 'badge-success' : rec.status === 'Alpa' ? 'badge-danger' : 'badge-warning'}">${rec.status} (${rec.time})</span>`
+          : `<span class="badge badge-teal">Belum Absen</span>`;
+        return `
+          <tr>
+            <td><strong>#${p.seatNo}</strong></td>
+            <td><span class="badge badge-info">${p.kelas}</span> <strong>No. ${p.classAbsenNo}</strong></td>
+            <td><strong>${p.name}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${p.studentId} • NISN: ${p.nisn || '-'}</div></td>
+            <td>${statusHtml}</td>
+            <td>
+              <div style="display:flex; gap:0.25rem;">
+                <button type="button" class="btn btn-success btn-xs" onclick="markAsesmenParticipant('${roomCfg.id}', '${p.studentId}', 'Hadir')">H</button>
+                <button type="button" class="btn btn-warning btn-xs" onclick="markAsesmenParticipant('${roomCfg.id}', '${p.studentId}', 'Sakit')">S</button>
+                <button type="button" class="btn btn-info btn-xs" onclick="markAsesmenParticipant('${roomCfg.id}', '${p.studentId}', 'Izin')">I</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="markAsesmenParticipant('${roomCfg.id}', '${p.studentId}', 'Alpa')">A</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function handlePengawasManualScan(e) {
+      e.preventDefault();
+      const inp = document.getElementById('pgCodeInput');
+      const code = inp.value.trim();
+      if (!code) return;
+      processPengawasScan(code);
+      inp.value = '';
+    }
+
+    function processPengawasScan(rawCode) {
+      ensureAsesmenDefaults();
+      const roomId = document.getElementById('pgRoomSelect')?.value || currentSession.asesmenRoomId || 'R.1';
+      const roomCfg = appData.asesmenRooms.find(r => r.id === roomId) || appData.asesmenRooms[0];
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      const found = findStudentAcrossSystem(rawCode);
+
+      if (!found) {
+        showToast('error', 'Kartu Tidak Dikenali', `Kode "${rawCode}" tidak ditemukan di database siswa.`);
+        return;
+      }
+
+      const inThisRoom = participants.find(p =>
+        p.studentId.toUpperCase() === found.id.toUpperCase() ||
+        (found.nisn && p.nisn === found.nisn) ||
+        p.name.toUpperCase() === found.name.toUpperCase()
+      );
+
+      if (!inThisRoom) {
+        let actualRoom = null;
+        for (const r of appData.asesmenRooms) {
+          const list = getAsesmenRoomParticipants(r);
+          if (list.some(x => x.studentId === found.id || x.name === found.name)) {
+            actualRoom = r.name;
+            break;
+          }
+        }
+        showToast('error', `Salah Ruang Assesmen!`, `${found.name} (${found.kelas}) bukan peserta ${roomCfg.name}${actualRoom ? ` (terdaftar di ${actualRoom})` : ''}.`);
+        return;
+      }
+
+      markAsesmenParticipant(roomCfg.id, inThisRoom.studentId, 'Hadir');
+    }
+
+    function markAsesmenParticipant(roomId, studentId, status, customDate = null, customSesi = null) {
+      ensureAsesmenDefaults();
+      const dateStr = customDate || document.getElementById('pgDateInput')?.value || getTodayISO();
+      const sesiStr = customSesi || document.getElementById('pgSesiSelect')?.value || 'Sesi 1';
+      const roomCfg = appData.asesmenRooms.find(r => r.id === roomId);
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      const p = participants.find(x => x.studentId === studentId);
+
+      if (!appData.asesmenAttendance[dateStr]) appData.asesmenAttendance[dateStr] = {};
+      if (!appData.asesmenAttendance[dateStr][sesiStr]) appData.asesmenAttendance[dateStr][sesiStr] = {};
+      if (!appData.asesmenAttendance[dateStr][sesiStr][roomId]) appData.asesmenAttendance[dateStr][sesiStr][roomId] = {};
+
+      const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      appData.asesmenAttendance[dateStr][sesiStr][roomId][studentId] = { status, time: timeStr };
+      saveAppData();
+
+      if (currentSession.role === 'pengawas') refreshPengawasUI();
+      if (currentSession.role === 'panitia') refreshPanitiaDashboard();
+      if (p) showToast('success', `${roomId} (${sesiStr}): ${status}`, `${p.name} (${p.kelas} No.${p.classAbsenNo}) • ${timeStr}`);
+    }
+
+    function markAllPengawasPresent() {
+      const roomId = document.getElementById('pgRoomSelect')?.value || 'R.1';
+      const roomCfg = appData.asesmenRooms.find(r => r.id === roomId);
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      participants.forEach(p => markAsesmenParticipant(roomId, p.studentId, 'Hadir'));
+    }
+
+    function exportPengawasRoomCSV() {
+      const roomId = document.getElementById('pgRoomSelect')?.value || 'R.1';
+      const roomCfg = appData.asesmenRooms.find(r => r.id === roomId);
+      const dateStr = document.getElementById('pgDateInput')?.value || getTodayISO();
+      const sesiStr = document.getElementById('pgSesiSelect')?.value || 'Sesi 1';
+      const sched = getAsesmenScheduleInfo(dateStr, sesiStr);
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[roomId] || {};
+
+      const lines = [
+        `Ruang;Sesi;Tanggal;Mata Pelajaran;No Duduk;Kelas;No Absen Kelas;Kode;NISN;Nama Siswa;Status;Waktu`,
+        ...participants.map(p => `${roomId};${sesiStr};${dateStr};"${sched.mapel}";${p.seatNo};${p.kelas};${p.classAbsenNo};${p.studentId};${p.nisn || '-'};"${p.name}";${attMap[p.studentId]?.status || 'Belum Absen'};${attMap[p.studentId]?.time || '-'}`)
+      ];
+      downloadTextFile(`Assesmen_${roomId}_${sesiStr.replace(/\s+/g,'')}_${dateStr}.csv`, '﻿' + lines.join('
+'), 'text/csv;charset=utf-8;');
+    }
+
+    /* =========================================================================
+       DASHBOARD PANITIA ASSESMEN & MENU EDIT RUANG / JADWAL
+       ========================================================================= */
+    function initPanitiaView() {
+      ensureAsesmenDefaults();
+      const dInp = document.getElementById('pnDateInput');
+      if (dInp && !dInp.value) {
+        const today = getTodayISO();
+        const hasToday = appData.asesmenSchedules.some(s => s.date === today);
+        dInp.value = hasToday ? today : (appData.asesmenSchedules[0]?.date || today);
+      }
+      switchPanitiaTab('rekap');
+      refreshPanitiaDashboard();
+    }
+
+    function switchPanitiaTab(tab) {
+      const map = {
+        rekap: ['pnTabRekap', 'pnTabBtnRekap'],
+        detail: ['pnTabDetail', 'pnTabBtnDetail'],
+        editRuang: ['pnTabEditRuang', 'pnTabBtnEditRuang'],
+        editJadwal: ['pnTabEditJadwal', 'pnTabBtnEditJadwal']
+      };
+      Object.keys(map).forEach(k => {
+        document.getElementById(map[k][0])?.classList.toggle('hidden', k !== tab);
+        document.getElementById(map[k][1])?.classList.toggle('active', k === tab);
+      });
+      if (tab === 'detail') renderPanitiaDetailTable();
+      if (tab === 'editRuang') renderPanitiaEditRoomsTable();
+      if (tab === 'editJadwal') renderPanitiaEditScheduleTable();
+    }
+
+    function refreshPanitiaDashboard() {
+      ensureAsesmenDefaults();
+      const dateStr = document.getElementById('pnDateInput')?.value || getTodayISO();
+      const sesiStr = document.getElementById('pnSesiSelect')?.value || 'Sesi 1';
+      const schedInfo = getAsesmenScheduleInfo(dateStr, sesiStr);
+
+      document.getElementById('pnScheduleSummaryText').textContent = `${schedInfo.dayLabel} • ${sesiStr} (${schedInfo.time}) — Mapel: ${schedInfo.mapel}`;
+
+      const detailRoomSel = document.getElementById('pnDetailRoomSelect');
+      if (detailRoomSel) {
+        const prev = detailRoomSel.value || 'R.1';
+        detailRoomSel.innerHTML = appData.asesmenRooms.map(r => `<option value="${r.id}">Ruang ${r.name} (${r.kelas1} & ${r.kelas2 || '-'})</option>`).join('');
+        if ([...detailRoomSel.options].some(o => o.value === prev)) detailRoomSel.value = prev;
+      }
+
+      let grandTotal = 0, grandHadir = 0, grandIzin = 0, grandBelum = 0;
+
+      const rowsHtml = appData.asesmenRooms.map(r => {
+        const participants = getAsesmenRoomParticipants(r);
+        const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[r.id] || {};
+        let hadir = 0, izin = 0, belum = 0;
+        participants.forEach(p => {
+          const st = attMap[p.studentId]?.status;
+          if (st === 'Hadir') hadir++;
+          else if (st === 'Sakit' || st === 'Izin') izin++;
+          else belum++;
+        });
+        grandTotal += participants.length;
+        grandHadir += hadir;
+        grandIzin += izin;
+        grandBelum += belum;
+
+        return `
+          <tr>
+            <td><strong>${r.name}</strong></td>
+            <td><span class="badge badge-info">${r.kelas1}</span> No. ${r.start1}–${r.end1}</td>
+            <td>${r.kelas2 ? `<span class="badge badge-purple">${r.kelas2}</span> No. ${r.start2}–${r.end2}` : '-'}</td>
+            <td><strong>${participants.length}</strong></td>
+            <td><span class="badge badge-success">${hadir}</span></td>
+            <td><span class="badge badge-warning">${izin}</span></td>
+            <td><span class="badge ${belum === 0 ? 'badge-teal' : 'badge-danger'}">${belum}</span></td>
+            <td><button type="button" class="btn btn-outline btn-xs" onclick="openPanitiaRoomDetail('${r.id}')">👁️ Detail</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('pnStatsGrid').innerHTML = `
+        <div class="stat-card"><div class="stat-label">Total Peserta (${appData.asesmenRooms.length} Ruang)</div><div class="stat-value">${grandTotal}</div></div>
+        <div class="stat-card"><div class="stat-label">Hadir (${sesiStr})</div><div class="stat-value" style="color:var(--success);">${grandHadir}</div></div>
+        <div class="stat-card"><div class="stat-label">Sakit / Izin</div><div class="stat-value" style="color:var(--warning);">${grandIzin}</div></div>
+        <div class="stat-card"><div class="stat-label">Belum Hadir / Alpa</div><div class="stat-value" style="color:var(--danger);">${grandBelum}</div></div>
+      `;
+
+      document.getElementById('pnRoomsSummaryBody').innerHTML = rowsHtml;
+
+      if (!document.getElementById('pnTabDetail').classList.contains('hidden')) renderPanitiaDetailTable();
+      if (!document.getElementById('pnTabEditRuang').classList.contains('hidden')) renderPanitiaEditRoomsTable();
+      if (!document.getElementById('pnTabEditJadwal').classList.contains('hidden')) renderPanitiaEditScheduleTable();
+    }
+
+    function openPanitiaRoomDetail(roomId) {
+      const sel = document.getElementById('pnDetailRoomSelect');
+      if (sel) sel.value = roomId;
+      switchPanitiaTab('detail');
+    }
+
+    function renderPanitiaDetailTable() {
+      const roomId = document.getElementById('pnDetailRoomSelect')?.value || 'R.1';
+      const statusFilter = document.getElementById('pnDetailStatusFilter')?.value || 'ALL';
+      const dateStr = document.getElementById('pnDateInput')?.value || getTodayISO();
+      const sesiStr = document.getElementById('pnSesiSelect')?.value || 'Sesi 1';
+      const roomCfg = appData.asesmenRooms.find(r => r.id === roomId) || appData.asesmenRooms[0];
+      const participants = getAsesmenRoomParticipants(roomCfg);
+      const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[roomId] || {};
+
+      const filtered = participants.filter(p => {
+        const st = attMap[p.studentId]?.status || '';
+        if (statusFilter === 'HADIR') return st === 'Hadir';
+        if (statusFilter === 'IZIN') return st === 'Sakit' || st === 'Izin';
+        if (statusFilter === 'BELUM') return st !== 'Hadir' && st !== 'Sakit' && st !== 'Izin';
+        return true;
+      });
+
+      const tbody = document.getElementById('pnDetailTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = filtered.length
+        ? filtered.map(p => {
+            const rec = attMap[p.studentId];
+            return `
+              <tr>
+                <td><strong>#${p.seatNo}</strong></td>
+                <td><strong>${roomId}</strong></td>
+                <td><span class="badge badge-info">${p.kelas}</span> No. ${p.classAbsenNo}</td>
+                <td class="mono">${p.studentId} / ${p.nisn || '-'}</td>
+                <td><strong>${p.name}</strong></td>
+                <td>${rec ? `<span class="badge ${rec.status === 'Hadir' ? 'badge-success' : rec.status === 'Alpa' ? 'badge-danger' : 'badge-warning'}">${rec.status} (${rec.time})</span>` : '<span class="badge badge-teal">Belum Absen</span>'}</td>
+                <td>
+                  <div style="display:flex; gap:0.25rem;">
+                    <button type="button" class="btn btn-success btn-xs" onclick="markAsesmenParticipant('${roomId}', '${p.studentId}', 'Hadir', '${dateStr}', '${sesiStr}')">H</button>
+                    <button type="button" class="btn btn-warning btn-xs" onclick="markAsesmenParticipant('${roomId}', '${p.studentId}', 'Sakit', '${dateStr}', '${sesiStr}')">S</button>
+                    <button type="button" class="btn btn-info btn-xs" onclick="markAsesmenParticipant('${roomId}', '${p.studentId}', 'Izin', '${dateStr}', '${sesiStr}')">I</button>
+                    <button type="button" class="btn btn-danger btn-xs" onclick="markAsesmenParticipant('${roomId}', '${p.studentId}', 'Alpa', '${dateStr}', '${sesiStr}')">A</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')
+        : `<tr><td colspan="7" style="text-align:center; padding:1rem; color:var(--text-muted);">Tidak ada peserta pada filter status ini.</td></tr>`;
+    }
+
+    function exportPanitiaAllRoomsCSV() {
+      const dateStr = document.getElementById('pnDateInput')?.value || getTodayISO();
+      const sesiStr = document.getElementById('pnSesiSelect')?.value || 'Sesi 1';
+      const sched = getAsesmenScheduleInfo(dateStr, sesiStr);
+      const lines = ['Ruang;Sesi;Tanggal;Mata Pelajaran;No Duduk;Kelas;No Absen Kelas;Kode;NISN;Nama Siswa;Status;Waktu'];
+
+      appData.asesmenRooms.forEach(r => {
+        const participants = getAsesmenRoomParticipants(r);
+        const attMap = appData.asesmenAttendance?.[dateStr]?.[sesiStr]?.[r.id] || {};
+        participants.forEach(p => {
+          lines.push(`${r.name};${sesiStr};${dateStr};"${sched.mapel}";${p.seatNo};${p.kelas};${p.classAbsenNo};${p.studentId};${p.nisn || '-'};"${p.name}";${attMap[p.studentId]?.status || 'Belum Absen'};${attMap[p.studentId]?.time || '-'}`);
+        });
+      });
+
+      downloadTextFile(`Rekap_Assesmen_SemuaRuang_${sesiStr.replace(/\s+/g,'')}_${dateStr}.csv`, '﻿' + lines.join('
+'), 'text/csv;charset=utf-8;');
+    }
+
+    /* MENU EDIT PEMBAGIAN RUANG ASSESMEN */
+    function renderPanitiaEditRoomsTable() {
+      const tbody = document.getElementById('pnEditRoomsBody');
+      if (!tbody) return;
+      tbody.innerHTML = appData.asesmenRooms.map(r => {
+        const jml1 = Math.max(0, (Number(r.end1) - Number(r.start1)) + 1);
+        const jml2 = r.kelas2 && Number(r.end2) > 0 ? Math.max(0, (Number(r.end2) - Number(r.start2)) + 1) : 0;
+        return `
+          <tr>
+            <td><strong>${r.name}</strong></td>
+            <td><span class="badge badge-info">${r.kelas1}</span></td>
+            <td class="mono">${r.start1}–${r.end1} (${jml1})</td>
+            <td>${r.kelas2 ? `<span class="badge badge-purple">${r.kelas2}</span>` : '-'}</td>
+            <td class="mono">${r.kelas2 ? `${r.start2}–${r.end2} (${jml2})` : '-'}</td>
+            <td><strong>${jml1 + jml2}</strong></td>
+            <td class="mono">${r.pin || '5050'}</td>
+            <td>
+              <div style="display:flex; gap:0.3rem;">
+                <button type="button" class="btn btn-warning btn-xs" onclick="openEditAsesmenRoomModal('${r.id}')">✏️ Edit</button>
+                <button type="button" class="btn btn-danger btn-xs" onclick="deleteAsesmenRoom('${r.id}')">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openEditAsesmenRoomModal(roomId) {
+      ensureAsesmenDefaults();
+      const clsOpts1 = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c] || c}</option>`).join('');
+      const clsOpts2 = `<option value="">-- Tidak Ada --</option>` + clsOpts1;
+      document.getElementById('editArKelas1').innerHTML = clsOpts1;
+      document.getElementById('editArKelas2').innerHTML = clsOpts2;
+
+      if (roomId === 'NEW') {
+        document.getElementById('editAsesmenRoomTitle').textContent = '+ Tambah Ruang Assesmen Baru';
+        document.getElementById('editArOriginalId').value = 'NEW';
+        document.getElementById('editArName').value = `R.${appData.asesmenRooms.length + 1}`;
+        document.getElementById('editArPin').value = '5050';
+        document.getElementById('editArKelas1').value = 'IXA';
+        document.getElementById('editArStart1').value = 1;
+        document.getElementById('editArEnd1').value = 16;
+        document.getElementById('editArKelas2').value = 'VIIA';
+        document.getElementById('editArStart2').value = 1;
+        document.getElementById('editArEnd2').value = 16;
+      } else {
+        const r = appData.asesmenRooms.find(x => x.id === roomId);
+        if (!r) return;
+        document.getElementById('editAsesmenRoomTitle').textContent = `✏️ Edit Pembagian ${r.name}`;
+        document.getElementById('editArOriginalId').value = r.id;
+        document.getElementById('editArName').value = r.name;
+        document.getElementById('editArPin').value = r.pin || '5050';
+        document.getElementById('editArKelas1').value = r.kelas1;
+        document.getElementById('editArStart1').value = r.start1;
+        document.getElementById('editArEnd1').value = r.end1;
+        document.getElementById('editArKelas2').value = r.kelas2 || '';
+        document.getElementById('editArStart2').value = r.start2 || 0;
+        document.getElementById('editArEnd2').value = r.end2 || 0;
+      }
+      document.getElementById('editAsesmenRoomModal').classList.remove('hidden');
+    }
+
+    function saveAsesmenRoomForm(e) {
+      e.preventDefault();
+      const origId = document.getElementById('editArOriginalId').value;
+      const name = document.getElementById('editArName').value.trim().toUpperCase();
+      const pin = document.getElementById('editArPin').value.trim() || '5050';
+      const kelas1 = document.getElementById('editArKelas1').value;
+      const start1 = parseInt(document.getElementById('editArStart1').value, 10) || 1;
+      const end1 = parseInt(document.getElementById('editArEnd1').value, 10) || 16;
+      const kelas2 = document.getElementById('editArKelas2').value;
+      const start2 = kelas2 ? (parseInt(document.getElementById('editArStart2').value, 10) || 1) : 0;
+      const end2 = kelas2 ? (parseInt(document.getElementById('editArEnd2').value, 10) || 16) : 0;
+
+      const obj = { id: name, name, kelas1, start1, end1, kelas2, start2, end2, pin };
+      if (origId === 'NEW') {
+        appData.asesmenRooms.push(obj);
+      } else {
+        const idx = appData.asesmenRooms.findIndex(r => r.id === origId);
+        if (idx >= 0) appData.asesmenRooms[idx] = obj;
+      }
+
+      saveAppData();
+      closeModal('editAsesmenRoomModal');
+      refreshPanitiaDashboard();
+      showToast('success', 'Pembagian Ruang Disimpan', `${name} berhasil diperbarui & tersinkron ke Cloud.`);
+    }
+
+    function deleteAsesmenRoom(roomId) {
+      if (appData.asesmenRooms.length <= 1) return;
+      appData.asesmenRooms = appData.asesmenRooms.filter(r => r.id !== roomId);
+      saveAppData();
+      refreshPanitiaDashboard();
+      showToast('warning', 'Ruang Dihapus', `Ruang ${roomId} telah dihapus.`);
+    }
+
+    function resetDefaultAsesmenRooms() {
+      appData.asesmenRooms = JSON.parse(JSON.stringify(DEFAULT_ASESMEN_ROOMS));
+      saveAppData();
+      refreshPanitiaDashboard();
+      showToast('success', 'Reset Berhasil', 'Pembagian ruang dikembalikan ke tabel default R.1 – R.21.');
+    }
+
+    /* MENU EDIT JADWAL ASSESMEN */
+    function openAsesmenScheduleModal() {
+      const dateStr = document.getElementById('pgDateInput')?.value || getTodayISO();
+      const idx = appData.asesmenSchedules.findIndex(s => s.date === dateStr);
+      openEditScheduleDayModal(idx >= 0 ? idx : 'NEW', dateStr);
+    }
+
+    function renderPanitiaEditScheduleTable() {
+      const tbody = document.getElementById('pnEditScheduleBody');
+      if (!tbody) return;
+      tbody.innerHTML = appData.asesmenSchedules.map((s, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${s.dayLabel}</strong><div class="mono" style="font-size:0.72rem; color:var(--text-muted);">${s.date}</div></td>
+          <td><span class="badge badge-info">${s.sesi1.time}</span><div style="font-weight:700; margin-top:2px;">${s.sesi1.mapel}</div></td>
+          <td><span class="badge badge-purple">${s.sesi2.time}</span><div style="font-weight:700; margin-top:2px;">${s.sesi2.mapel}</div></td>
+          <td>${s.sesi3 && s.sesi3.mapel ? `<span class="badge badge-warning">${s.sesi3.time}</span><div style="font-weight:700; margin-top:2px;">${s.sesi3.mapel}</div>` : '-'}</td>
+          <td>
+            <div style="display:flex; gap:0.3rem;">
+              <button type="button" class="btn btn-warning btn-xs" onclick="openEditScheduleDayModal(${idx})">✏️ Edit</button>
+              <button type="button" class="btn btn-danger btn-xs" onclick="deleteScheduleDay(${idx})">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openEditScheduleDayModal(idx, presetDate = '') {
+      ensureAsesmenDefaults();
+      if (idx === 'NEW') {
+        document.getElementById('editAsesmenSchedTitle').textContent = '+ Tambah Hari Jadwal Assesmen';
+        document.getElementById('editSchedIndex').value = 'NEW';
+        document.getElementById('editSchedDate').value = presetDate || getTodayISO();
+        document.getElementById('editSchedDayLabel').value = '';
+        document.getElementById('editSchedSesi1Time').value = '07.15 - 09.15';
+        document.getElementById('editSchedSesi1Mapel').value = '';
+        document.getElementById('editSchedSesi2Time').value = '10.30 - 12.00';
+        document.getElementById('editSchedSesi2Mapel').value = '';
+        document.getElementById('editSchedSesi3Time').value = '';
+        document.getElementById('editSchedSesi3Mapel').value = '';
+      } else {
+        const s = appData.asesmenSchedules[idx];
+        if (!s) return;
+        document.getElementById('editAsesmenSchedTitle').textContent = `✏️ Edit Jadwal — ${s.dayLabel}`;
+        document.getElementById('editSchedIndex').value = idx;
+        document.getElementById('editSchedDate').value = s.date;
+        document.getElementById('editSchedDayLabel').value = s.dayLabel;
+        document.getElementById('editSchedSesi1Time').value = s.sesi1.time;
+        document.getElementById('editSchedSesi1Mapel').value = s.sesi1.mapel;
+        document.getElementById('editSchedSesi2Time').value = s.sesi2.time;
+        document.getElementById('editSchedSesi2Mapel').value = s.sesi2.mapel;
+        document.getElementById('editSchedSesi3Time').value = (s.sesi3 && s.sesi3.time) || '';
+        document.getElementById('editSchedSesi3Mapel').value = (s.sesi3 && s.sesi3.mapel) || '';
+      }
+      document.getElementById('editAsesmenScheduleModal').classList.remove('hidden');
+    }
+
+    function saveAsesmenScheduleForm(e) {
+      e.preventDefault();
+      const idxRaw = document.getElementById('editSchedIndex').value;
+      const obj = {
+        date: document.getElementById('editSchedDate').value,
+        dayLabel: document.getElementById('editSchedDayLabel').value.trim(),
+        sesi1: {
+          time: document.getElementById('editSchedSesi1Time').value.trim(),
+          mapel: document.getElementById('editSchedSesi1Mapel').value.trim()
+        },
+        sesi2: {
+          time: document.getElementById('editSchedSesi2Time').value.trim(),
+          mapel: document.getElementById('editSchedSesi2Mapel').value.trim()
+        },
+        sesi3: {
+          time: document.getElementById('editSchedSesi3Time').value.trim(),
+          mapel: document.getElementById('editSchedSesi3Mapel').value.trim()
+        }
+      };
+
+      if (idxRaw === 'NEW') {
+        appData.asesmenSchedules.push(obj);
+      } else {
+        appData.asesmenSchedules[parseInt(idxRaw, 10)] = obj;
+      }
+
+      saveAppData();
+      closeModal('editAsesmenScheduleModal');
+      if (currentSession.role === 'pengawas') {
+        updatePengawasSesiDropdown(document.getElementById('pgDateInput').value);
+        refreshPengawasUI();
+      }
+      if (currentSession.role === 'panitia') refreshPanitiaDashboard();
+      showToast('success', 'Jadwal Assesmen Disimpan', `${obj.dayLabel} berhasil diperbarui.`);
+    }
+
+    function deleteScheduleDay(idx) {
+      if (appData.asesmenSchedules.length <= 1) return;
+      appData.asesmenSchedules.splice(idx, 1);
+      saveAppData();
+      refreshPanitiaDashboard();
+      showToast('warning', 'Jadwal Dihapus', 'Hari ujian telah dihapus.');
+    }
+
+    function resetDefaultAsesmenSchedules() {
+      appData.asesmenSchedules = JSON.parse(JSON.stringify(DEFAULT_ASESMEN_SCHEDULES));
+      saveAppData();
+      refreshPanitiaDashboard();
+      showToast('success', 'Reset Berhasil', 'Jadwal dikembalikan ke jadwal 30 Nov – 04 Des 2026.');
     }
 
     /* =========================================================================
