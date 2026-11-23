@@ -6,6 +6,7 @@
   <title>Sistem Absensi Digital Terpadu - SMP Negeri 1 Tempuran</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --primary: #0f2557;
@@ -881,6 +882,7 @@
                   <th>Nama Siswa</th>
                   <th>🕌 Sholat Dzuhur</th>
                   <th>🌅 Sholat Dhuha</th>
+                  <th>⚠️ Catatan Pembinaan / Pelanggaran (Guru Wali)</th>
                 </tr>
               </thead>
               <tbody id="agamaSholatTableBody"></tbody>
@@ -1087,16 +1089,22 @@
     </div>
 
     <!-- ===================================================================
-         3. WORKSPACE KHUSUS GURU WALI (HANYA ABSEN SHOLAT DZUHUR)
+         3. WORKSPACE KHUSUS GURU WALI (ABSEN SHOLAT DZUHUR + SHEET REKAP & PELANGGARAN)
          =================================================================== -->
     <div id="guruWaliWorkspaceView" class="hidden">
       <div class="hero-card">
         <span class="badge badge-gold" style="margin-bottom:0.4rem;">🕌 AKUN KHUSUS GURU WALI</span>
-        <h2 id="guruWaliTitle">Absensi Sholat Dzuhur Berjamaah</h2>
-        <p id="guruWaliSub">Mode khusus pencatatan Sholat Dzuhur siswa per kelas (VIIA–IXG). Hasil absensi otomatis terkirim ke Wali Kelas, Guru BK, dan Guru Agama.</p>
+        <h2 id="guruWaliTitle">Absensi Sholat Dzuhur &amp; Sheet Rekap Pembinaan Siswa</h2>
+        <p id="guruWaliSub">Pencatatan Sholat Dzuhur berjamaah, rekap kehadiran Harian/Mingguan/Bulanan, catatan pelanggaran tata tertib siswa, serta download langsung ke Excel (.xlsx).</p>
       </div>
 
-      <div class="grid-2">
+      <div class="tab-nav">
+        <button type="button" id="gwTabBtnScan" class="tab-btn active" onclick="switchGuruWaliTab('scan')">🕌 Absen Sholat Dzuhur &amp; Catatan Harian</button>
+        <button type="button" id="gwTabBtnRekap" class="tab-btn" onclick="switchGuruWaliTab('rekap')">📊 Sheet Rekap Absensi (Harian, Mingguan, Bulanan &amp; Excel)</button>
+      </div>
+
+      <!-- TAB 1 GURU WALI: SCAN SHOLAT DZUHUR + CATATAN PELANGGARAN HARIAN -->
+      <section id="gwTabScan" class="grid-2">
         <div class="card">
           <div class="card-header">
             <h3>📷 Scan QR Sholat Dzuhur</h3>
@@ -1121,30 +1129,64 @@
 
         <div class="card">
           <div class="card-header">
-            <h3>📋 Daftar Sholat Dzuhur per Kelas</h3>
+            <h3>📋 Daftar Sholat Dzuhur &amp; Catatan Pelanggaran</h3>
             <div style="display:flex; gap:0.45rem; flex-wrap:wrap;">
               <select id="gwClassSelect" class="form-control" style="width:auto; font-weight:800;" onchange="refreshGuruWaliUI()"></select>
               <button type="button" class="btn btn-success btn-sm" onclick="markAllGuruWaliJamaah()">✅ Jamaah Semua</button>
             </div>
           </div>
-          <div style="margin-bottom:0.65rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.65rem; flex-wrap:wrap; gap:0.4rem;">
             <span id="gwSummaryBadge" class="badge badge-success">Jamaah Dzuhur: 0 Siswa</span>
+            <span style="font-size:0.74rem; color:var(--text-muted);">Isi kolom catatan jika siswa melanggar tata tertib</span>
           </div>
-          <div class="table-wrap" style="max-height:380px; overflow-y:auto;">
+          <div class="table-wrap" style="max-height:400px; overflow-y:auto;">
             <table>
               <thead>
                 <tr>
                   <th>No</th>
-                  <th>Nama Siswa &amp; Kode</th>
+                  <th>Nama Siswa</th>
                   <th>Status Dzuhur</th>
                   <th>Tandai</th>
+                  <th>⚠️ Catatan Pelanggaran Aturan</th>
                 </tr>
               </thead>
               <tbody id="gwTableBody"></tbody>
             </table>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- TAB 2 GURU WALI: SHEET REKAP HARIAN / MINGGUAN / BULANAN + DOWNLOAD EXCEL -->
+      <section id="gwTabRekap" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>📊 Sheet Rekap Absensi Siswa &amp; Catatan Pelanggaran (Khusus Guru Wali)</h3>
+              <p id="gwRekapPeriodSubtitle" style="font-size:0.78rem; color:var(--text-muted);">Pilih periode Harian, Mingguan, atau Bulanan untuk melihat rekap sholat, absen pagi, dan catatan pelanggaran siswa.</p>
+            </div>
+            <div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center;">
+              <select id="gwRekapClassSelect" class="form-control" style="width:auto; font-weight:800;" onchange="renderGuruWaliRekapSheet()"></select>
+              <select id="gwRekapPeriodType" class="form-control" style="width:auto; font-weight:800;" onchange="onGwRekapPeriodChange()">
+                <option value="harian">📅 Rekap Harian</option>
+                <option value="mingguan">📆 Rekap Mingguan (Senin–Sabtu)</option>
+                <option value="bulanan">🗓️ Rekap Bulanan (1 Bulan Penuh)</option>
+              </select>
+              <input type="date" id="gwRekapDateInput" class="form-control" style="width:auto;" onchange="renderGuruWaliRekapSheet()" />
+              <input type="month" id="gwRekapMonthInput" class="form-control hidden" style="width:auto;" onchange="renderGuruWaliRekapSheet()" />
+              <button type="button" class="btn btn-success btn-sm" onclick="downloadGuruWaliExcel()">📥 Download Excel (.xlsx)</button>
+            </div>
+          </div>
+
+          <div class="stats-grid" id="gwRekapStatsGrid" style="margin-bottom:1rem;"></div>
+
+          <div class="table-wrap" style="max-height:480px; overflow:auto;">
+            <table id="gwRekapSheetTable">
+              <thead id="gwRekapSheetHead"></thead>
+              <tbody id="gwRekapSheetBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- ===================================================================
@@ -1170,8 +1212,14 @@
 
       <div class="card" style="margin-bottom:1rem;">
         <div class="card-header">
-          <h3>📊 Matriks Laporan Kehadiran Siswa (Absen Pagi + Sholat + Semua Guru Mapel)</h3>
-          <span id="hrActiveMapelBadge" class="badge badge-info">0 Mapel Mengisi Absen</span>
+          <div>
+            <h3>📊 Matriks Laporan Kehadiran &amp; Catatan Guru Wali (Absen Pagi + Sholat + Mapel + Pelanggaran)</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted);">Terhubung otomatis dengan input Sholat &amp; Catatan Pelanggaran dari Guru Wali dan Guru Agama.</p>
+          </div>
+          <div style="display:flex; gap:0.45rem; flex-wrap:wrap; align-items:center;">
+            <span id="hrActiveMapelBadge" class="badge badge-info">0 Mapel Mengisi Absen</span>
+            <button type="button" class="btn btn-success btn-xs" onclick="downloadHomeroomExcel()">📥 Download Excel (.xlsx)</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -1184,6 +1232,7 @@
                 <th>🕌 Sholat Dzuhur</th>
                 <th>🌅 Sholat Dhuha</th>
                 <th>📘 Ringkasan Mapel</th>
+                <th>⚠️ Catatan Pelanggaran (Guru Wali)</th>
               </tr>
             </thead>
             <tbody id="hrMatrixTableBody"></tbody>
@@ -3263,18 +3312,25 @@
       const list = appData.masterStudents[cls] || [];
       const dzuhurMap = appData.sholatAttendance?.[dateStr]?.Dzuhur?.[cls] || {};
       const dhuhaMap = appData.sholatAttendance?.[dateStr]?.Dhuha?.[cls] || {};
+      const notesMap = appData.guruWaliNotes?.[dateStr]?.[cls] || {};
 
       const tbody = document.getElementById('agamaSholatTableBody');
       if (!tbody) return;
-      tbody.innerHTML = list.map((s, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td class="mono">${s.id} / ${s.nisn || '-'}</td>
-          <td><strong>${s.name}</strong></td>
-          <td>${dzuhurMap[s.id] ? `<span class="badge badge-success">${dzuhurMap[s.id].status} (${dzuhurMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
-          <td>${dhuhaMap[s.id] ? `<span class="badge badge-success">${dhuhaMap[s.id].status} (${dhuhaMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = list.map((s, i) => {
+        const note = notesMap[s.id] || '';
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td class="mono">${s.id} / ${s.nisn || '-'}</td>
+            <td><strong>${s.name}</strong></td>
+            <td>${dzuhurMap[s.id] ? `<span class="badge ${dzuhurMap[s.id].status === 'Jamaah' ? 'badge-success' : 'badge-purple'}">${dzuhurMap[s.id].status} (${dzuhurMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
+            <td>${dhuhaMap[s.id] ? `<span class="badge ${dhuhaMap[s.id].status === 'Jamaah' ? 'badge-success' : 'badge-purple'}">${dhuhaMap[s.id].status} (${dhuhaMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
+            <td style="color:${note ? 'var(--danger)' : 'var(--text-muted)'}; font-weight:${note ? '700' : '400'};">
+              ${note ? `⚠️ ${note}` : 'Tertib'}
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function exportWsSholatCSV() {
@@ -3293,17 +3349,65 @@
       const list = appData.masterStudents[cls] || [];
       const dz = appData.sholatAttendance?.[dateStr]?.Dzuhur?.[cls] || {};
       const dh = appData.sholatAttendance?.[dateStr]?.Dhuha?.[cls] || {};
-      const lines = ['No;Kode;Nama;Kelas;Dzuhur;Dhuha', ...list.map((s, i) => `${i + 1};${s.id};"${s.name}";${cls};${dz[s.id]?.status || 'Belum'};${dh[s.id]?.status || 'Belum'}`)];
+      const notes = appData.guruWaliNotes?.[dateStr]?.[cls] || {};
+      const lines = ['No;Kode;Nama;Kelas;Dzuhur;Dhuha;Catatan Pelanggaran Guru Wali', ...list.map((s, i) => `${i + 1};${s.id};"${s.name}";${cls};${dz[s.id]?.status || 'Belum'};${dh[s.id]?.status || 'Belum'};"${notes[s.id] || 'Tertib'}"`)];
       downloadTextFile(`Rekap_Sholat_${cls}_${dateStr}.csv`, '\uFEFF' + lines.join('\n'), 'text/csv;charset=utf-8;');
     }
 
-    /* WORKSPACE KHUSUS GURU WALI */
+    /* WORKSPACE KHUSUS GURU WALI (ABSEN SHOLAT, CATATAN PELANGGARAN & SHEET REKAP EXCEL) */
     function initGuruWaliView() {
+      const today = getTodayISO();
       const d = document.getElementById('guruWaliDateInput');
-      if (d && !d.value) d.value = getTodayISO();
+      if (d && !d.value) d.value = today;
+
+      const rd = document.getElementById('gwRekapDateInput');
+      if (rd && !rd.value) rd.value = today;
+
+      const rm = document.getElementById('gwRekapMonthInput');
+      if (rm && !rm.value) rm.value = today.slice(0, 7);
+
+      const clsOpts = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c] || c}</option>`).join('');
       const sel = document.getElementById('gwClassSelect');
-      if (sel) sel.innerHTML = ALL_CLASSES.map(c => `<option value="${c}">${CLASS_LABELS[c] || c}</option>`).join('');
+      if (sel) sel.innerHTML = clsOpts;
+
+      const rSel = document.getElementById('gwRekapClassSelect');
+      if (rSel) rSel.innerHTML = clsOpts;
+
+      switchGuruWaliTab('scan');
       refreshGuruWaliUI();
+    }
+
+    function switchGuruWaliTab(tab) {
+      stopAllCameras();
+      document.getElementById('gwTabScan')?.classList.toggle('hidden', tab !== 'scan');
+      document.getElementById('gwTabRekap')?.classList.toggle('hidden', tab !== 'rekap');
+      document.getElementById('gwTabBtnScan')?.classList.toggle('active', tab === 'scan');
+      document.getElementById('gwTabBtnRekap')?.classList.toggle('active', tab === 'rekap');
+
+      if (tab === 'rekap') {
+        const scanCls = document.getElementById('gwClassSelect')?.value;
+        const rSel = document.getElementById('gwRekapClassSelect');
+        if (scanCls && rSel) rSel.value = scanCls;
+        renderGuruWaliRekapSheet();
+      } else {
+        refreshGuruWaliUI();
+      }
+    }
+
+    function saveGuruWaliViolationNote(cls, studentId, noteText, customDate = null) {
+      if (!appData.guruWaliNotes) appData.guruWaliNotes = {};
+      const dateStr = customDate || document.getElementById('guruWaliDateInput')?.value || getTodayISO();
+      if (!appData.guruWaliNotes[dateStr]) appData.guruWaliNotes[dateStr] = {};
+      if (!appData.guruWaliNotes[dateStr][cls]) appData.guruWaliNotes[dateStr][cls] = {};
+
+      const clean = String(noteText || '').trim();
+      if (clean) {
+        appData.guruWaliNotes[dateStr][cls][studentId] = clean;
+      } else {
+        delete appData.guruWaliNotes[dateStr][cls][studentId];
+      }
+      saveAppData();
+      showToast('info', 'Catatan Disimpan', clean ? `Catatan pelanggaran untuk ${studentId} tersimpan.` : `Catatan untuk ${studentId} dikosongkan.`);
     }
 
     function handleGuruWaliManualScan(e) {
@@ -3352,15 +3456,18 @@
       const dateStr = document.getElementById('guruWaliDateInput')?.value || getTodayISO();
       const list = appData.masterStudents[cls] || [];
       const map = appData.sholatAttendance?.[dateStr]?.Dzuhur?.[cls] || {};
+      const notesMap = appData.guruWaliNotes?.[dateStr]?.[cls] || {};
 
       let jamaah = 0;
       list.forEach(s => { if (map[s.id]?.status === 'Jamaah') jamaah++; });
-      document.getElementById('gwSummaryBadge').textContent = `Jamaah Dzuhur: ${jamaah} / ${list.length} Siswa`;
+      const badge = document.getElementById('gwSummaryBadge');
+      if (badge) badge.textContent = `Jamaah Dzuhur: ${jamaah} / ${list.length} Siswa`;
 
       const tbody = document.getElementById('gwTableBody');
       if (!tbody) return;
       tbody.innerHTML = list.map((s, i) => {
         const rec = map[s.id];
+        const noteVal = (notesMap[s.id] || '').replace(/"/g, '&quot;');
         return `
           <tr>
             <td>${i + 1}</td>
@@ -3372,9 +3479,303 @@
                 <button type="button" class="btn btn-purple btn-xs" onclick="markGuruWaliStudent('${s.id}', 'Udzur')">Udzur</button>
               </div>
             </td>
+            <td style="min-width:190px;">
+              <input type="text" class="form-control" style="padding:0.32rem 0.55rem; font-size:0.78rem;"
+                placeholder="Tulis pelanggaran (misal: Terlambat, Atribut...)"
+                value="${noteVal}"
+                onchange="saveGuruWaliViolationNote('${cls}', '${s.id}', this.value)" />
+            </td>
           </tr>
         `;
       }).join('');
+
+      if (!document.getElementById('gwTabRekap')?.classList.contains('hidden')) {
+        renderGuruWaliRekapSheet();
+      }
+    }
+
+    function onGwRekapPeriodChange() {
+      const pType = document.getElementById('gwRekapPeriodType')?.value || 'harian';
+      document.getElementById('gwRekapDateInput')?.classList.toggle('hidden', pType === 'bulanan');
+      document.getElementById('gwRekapMonthInput')?.classList.toggle('hidden', pType !== 'bulanan');
+      renderGuruWaliRekapSheet();
+    }
+
+    function getDatesInRangeForGw(periodType) {
+      if (periodType === 'harian') {
+        const dStr = document.getElementById('gwRekapDateInput')?.value || getTodayISO();
+        return { dates: [dStr], label: `Harian (${formatIndonesianDayDate(dStr)})`, fileTag: `Harian_${dStr}` };
+      } else if (periodType === 'mingguan') {
+        const dStr = document.getElementById('gwRekapDateInput')?.value || getTodayISO();
+        const parts = dStr.split('-').map(Number);
+        const base = new Date(parts[0], parts[1] - 1, parts[2]);
+        const day = base.getDay(); // 0=Min, 1=Sen ... 6=Sab
+        const diffToMon = day === 0 ? -6 : 1 - day;
+        const mon = new Date(base);
+        mon.setDate(base.getDate() + diffToMon);
+
+        const dates = [];
+        for (let i = 0; i < 6; i++) {
+          const cur = new Date(mon);
+          cur.setDate(mon.getDate() + i);
+          const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
+          dates.push(iso);
+        }
+        return {
+          dates,
+          label: `Mingguan (${dates[0]} s.d. ${dates[dates.length - 1]})`,
+          fileTag: `Mingguan_${dates[0]}_sd_${dates[dates.length - 1]}`
+        };
+      } else {
+        const mStr = document.getElementById('gwRekapMonthInput')?.value || getTodayISO().slice(0, 7);
+        const [yr, mo] = mStr.split('-').map(Number);
+        const daysInMonth = new Date(yr, mo, 0).getDate();
+        const dates = [];
+        for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+          const cur = new Date(yr, mo - 1, dayNum);
+          if (cur.getDay() === 0) continue; // Lewati hari Minggu
+          dates.push(`${yr}-${String(mo).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`);
+        }
+        return {
+          dates,
+          label: `Bulanan (${mStr})`,
+          fileTag: `Bulanan_${mStr}`
+        };
+      }
+    }
+
+    function buildGuruWaliRekapDataset() {
+      const cls = document.getElementById('gwRekapClassSelect')?.value || 'VIIA';
+      const periodType = document.getElementById('gwRekapPeriodType')?.value || 'harian';
+      const periodInfo = getDatesInRangeForGw(periodType);
+      const students = appData.masterStudents[cls] || [];
+
+      const rows = students.map((s, idx) => {
+        let hadirPagi = 0, telatPagi = 0, jamaahDzuhur = 0, udzurDzuhur = 0, belumDzuhur = 0, izinDisetujui = 0;
+        const violationNotes = [];
+        const dailyCodes = [];
+
+        periodInfo.dates.forEach(dt => {
+          const pagiRec = appData.pagiAttendance?.[dt]?.[cls]?.[s.id];
+          if (pagiRec?.status === 'Hadir') hadirPagi++;
+          else if (pagiRec?.status === 'Terlambat') telatPagi++;
+
+          const dzRec = appData.sholatAttendance?.[dt]?.Dzuhur?.[cls]?.[s.id];
+          if (dzRec?.status === 'Jamaah') {
+            jamaahDzuhur++;
+            dailyCodes.push('J');
+          } else if (dzRec?.status === 'Udzur') {
+            udzurDzuhur++;
+            dailyCodes.push('U');
+          } else {
+            belumDzuhur++;
+            dailyCodes.push('-');
+          }
+
+          const approvedIzin = (appData.izinRequests || []).find(iz => iz.date === dt && iz.kelas === cls && (iz.studentId === s.id || iz.studentName === s.name) && iz.status === 'Disetujui');
+          if (approvedIzin) izinDisetujui++;
+
+          const note = appData.guruWaliNotes?.[dt]?.[cls]?.[s.id];
+          if (note) {
+            violationNotes.push(periodType === 'harian' ? note : `[${dt.slice(5)}] ${note}`);
+          }
+        });
+
+        return {
+          no: idx + 1,
+          id: s.id,
+          nisn: s.nisn || '-',
+          name: s.name,
+          kelas: cls,
+          hadirPagi,
+          telatPagi,
+          jamaahDzuhur,
+          udzurDzuhur,
+          belumDzuhur,
+          izinDisetujui,
+          dailyCodes,
+          violationSummary: violationNotes.join('; ')
+        };
+      });
+
+      return { cls, periodType, periodInfo, rows };
+    }
+
+    function renderGuruWaliRekapSheet() {
+      const { cls, periodType, periodInfo, rows } = buildGuruWaliRekapDataset();
+      const sub = document.getElementById('gwRekapPeriodSubtitle');
+      if (sub) sub.textContent = `Kelas ${CLASS_LABELS[cls] || cls} • Periode: ${periodInfo.label} (${periodInfo.dates.length} hari efektif)`;
+
+      let totalJamaah = 0, totalUdzur = 0, totalPelanggaran = 0;
+      rows.forEach(r => {
+        totalJamaah += r.jamaahDzuhur;
+        totalUdzur += r.udzurDzuhur;
+        if (r.violationSummary) totalPelanggaran++;
+      });
+
+      const statsGrid = document.getElementById('gwRekapStatsGrid');
+      if (statsGrid) {
+        statsGrid.innerHTML = `
+          <div class="stat-card"><div class="stat-label">Jumlah Siswa (${cls})</div><div class="stat-value">${rows.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Total Jamaah Dzuhur</div><div class="stat-value" style="color:var(--success);">${totalJamaah}</div></div>
+          <div class="stat-card"><div class="stat-label">Total Udzur Syar'i</div><div class="stat-value" style="color:var(--purple);">${totalUdzur}</div></div>
+          <div class="stat-card"><div class="stat-label">Siswa Ada Catatan Pelanggaran</div><div class="stat-value" style="color:var(--danger);">${totalPelanggaran}</div></div>
+        `;
+      }
+
+      const thead = document.getElementById('gwRekapSheetHead');
+      const tbody = document.getElementById('gwRekapSheetBody');
+      if (!thead || !tbody) return;
+
+      if (periodType === 'harian') {
+        const dStr = periodInfo.dates[0];
+        thead.innerHTML = `
+          <tr>
+            <th>No</th>
+            <th>NISN / Kode</th>
+            <th>Nama Siswa</th>
+            <th>Absen Pagi</th>
+            <th>Sholat Dzuhur</th>
+            <th>Izin / Sakit</th>
+            <th>⚠️ Catatan Pelanggaran Aturan (Dapat Diedit Langsung)</th>
+          </tr>
+        `;
+        tbody.innerHTML = rows.map(r => {
+          const pagiRec = appData.pagiAttendance?.[dStr]?.[cls]?.[r.id];
+          const dzRec = appData.sholatAttendance?.[dStr]?.Dzuhur?.[cls]?.[r.id];
+          const safeNote = r.violationSummary.replace(/"/g, '&quot;');
+          return `
+            <tr>
+              <td>${r.no}</td>
+              <td class="mono">${r.nisn}<div style="font-size:0.7rem; color:var(--text-muted);">${r.id}</div></td>
+              <td><strong>${r.name}</strong></td>
+              <td>${pagiRec ? `<span class="badge ${pagiRec.status === 'Hadir' ? 'badge-success' : 'badge-warning'}">${pagiRec.status} (${pagiRec.time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
+              <td>${dzRec ? `<span class="badge ${dzRec.status === 'Jamaah' ? 'badge-success' : 'badge-purple'}">${dzRec.status} (${dzRec.time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
+              <td>${r.izinDisetujui > 0 ? '<span class="badge badge-info">Disetujui</span>' : '-'}</td>
+              <td style="min-width:230px;">
+                <input type="text" class="form-control" style="padding:0.32rem 0.55rem; font-size:0.8rem;"
+                  placeholder="Kosong jika tertib / tulis pelanggaran..."
+                  value="${safeNote}"
+                  onchange="saveGuruWaliViolationNote('${cls}', '${r.id}', this.value, '${dStr}')" />
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        const dayHeaders = periodInfo.dates.map(dt => `<th style="text-align:center; padding:0.45rem 0.35rem; font-size:0.74rem;">${dt.slice(8, 10)}/${dt.slice(5, 7)}</th>`).join('');
+        thead.innerHTML = `
+          <tr>
+            <th>No</th>
+            <th>NISN</th>
+            <th>Nama Siswa</th>
+            ${dayHeaders}
+            <th style="text-align:center;">Jamaah</th>
+            <th style="text-align:center;">Udzur</th>
+            <th style="text-align:center;">Belum</th>
+            <th style="text-align:center;">Pagi Hadir</th>
+            <th>⚠️ Rekap Catatan Pelanggaran Aturan</th>
+          </tr>
+        `;
+        tbody.innerHTML = rows.map(r => {
+          const dayCells = r.dailyCodes.map(c => {
+            const color = c === 'J' ? 'color:var(--success); font-weight:900;' : c === 'U' ? 'color:var(--purple); font-weight:900;' : 'color:#94a3b8;';
+            return `<td style="text-align:center; padding:0.4rem 0.3rem; ${color}">${c}</td>`;
+          }).join('');
+          return `
+            <tr>
+              <td>${r.no}</td>
+              <td class="mono">${r.nisn}</td>
+              <td style="white-space:nowrap;"><strong>${r.name}</strong></td>
+              ${dayCells}
+              <td style="text-align:center;"><span class="badge badge-success">${r.jamaahDzuhur}</span></td>
+              <td style="text-align:center;"><span class="badge badge-purple">${r.udzurDzuhur}</span></td>
+              <td style="text-align:center;"><span class="badge badge-teal">${r.belumDzuhur}</span></td>
+              <td style="text-align:center;"><strong>${r.hadirPagi}</strong></td>
+              <td style="min-width:210px; color:${r.violationSummary ? 'var(--danger)' : 'var(--text-muted)'}; font-weight:${r.violationSummary ? '700' : '400'};">
+                ${r.violationSummary || 'Tertib (Tidak ada catatan)'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    function downloadGuruWaliExcel() {
+      const { cls, periodType, periodInfo, rows } = buildGuruWaliRekapDataset();
+      const filename = `Rekap_GuruWali_${cls}_${periodInfo.fileTag}.xlsx`;
+
+      if (typeof XLSX === 'undefined') {
+        const csvLines = [
+          'No;NISN;Kode;Nama Siswa;Kelas;Hadir Pagi;Terlambat Pagi;Jamaah Dzuhur;Udzur Dzuhur;Belum Dzuhur;Catatan Pelanggaran Aturan',
+          ...rows.map(r => `${r.no};${r.nisn};${r.id};"${r.name}";${cls};${r.hadirPagi};${r.telatPagi};${r.jamaahDzuhur};${r.udzurDzuhur};${r.belumDzuhur};"${r.violationSummary || 'Tertib'}"`)
+        ];
+        downloadTextFile(filename.replace('.xlsx', '.csv'), '\uFEFF' + csvLines.join('\n'), 'text/csv;charset=utf-8;');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const aoa = [
+        ['REKAP ABSENSI SISWA & CATATAN PELANGGARAN TATA TERTIB (KHUSUS GURU WALI)'],
+        ['SMP NEGERI 1 TEMPURAN'],
+        [`Kelas: ${CLASS_LABELS[cls] || cls} | Periode: ${periodInfo.label}`],
+        []
+      ];
+
+      if (periodType === 'harian') {
+        const dStr = periodInfo.dates[0];
+        aoa.push(['No', 'NISN', 'Kode Kartu', 'Nama Siswa', 'Kelas', 'Absen Pagi', 'Sholat Dzuhur', 'Izin/Sakit', 'Catatan Pelanggaran Aturan']);
+        rows.forEach(r => {
+          const pagiRec = appData.pagiAttendance?.[dStr]?.[cls]?.[r.id];
+          const dzRec = appData.sholatAttendance?.[dStr]?.Dzuhur?.[cls]?.[r.id];
+          aoa.push([
+            r.no,
+            r.nisn,
+            r.id,
+            r.name,
+            cls,
+            pagiRec ? `${pagiRec.status} (${pagiRec.time})` : 'Belum Absen',
+            dzRec ? `${dzRec.status} (${dzRec.time})` : 'Belum Absen',
+            r.izinDisetujui > 0 ? 'Disetujui' : '-',
+            r.violationSummary || 'Tertib'
+          ]);
+        });
+      } else {
+        const dateCols = periodInfo.dates.map(dt => `${dt.slice(8, 10)}/${dt.slice(5, 7)}`);
+        aoa.push(['No', 'NISN', 'Nama Siswa', 'Kelas', ...dateCols, 'Total Jamaah (J)', 'Total Udzur (U)', 'Belum (-)', 'Hadir Pagi', 'Terlambat Pagi', 'Rekap Catatan Pelanggaran Aturan']);
+        rows.forEach(r => {
+          aoa.push([
+            r.no,
+            r.nisn,
+            r.name,
+            cls,
+            ...r.dailyCodes,
+            r.jamaahDzuhur,
+            r.udzurDzuhur,
+            r.belumDzuhur,
+            r.hadirPagi,
+            r.telatPagi,
+            r.violationSummary || 'Tertib'
+          ]);
+        });
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [
+        { wch: 5 },
+        { wch: 15 },
+        { wch: 28 },
+        { wch: 12 },
+        ...periodInfo.dates.map(() => ({ wch: 7 })),
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 42 }
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, `Rekap_${cls}`);
+      XLSX.writeFile(wb, filename);
+      showToast('success', 'Excel Berhasil Diunduh', `File ${filename} siap dibuka di Microsoft Excel.`);
     }
 
     /* =========================================================================
@@ -3407,6 +3808,7 @@
       const pagiMap = appData.pagiAttendance?.[dateStr]?.[cls] || {};
       const dzuhurMap = appData.sholatAttendance?.[dateStr]?.Dzuhur?.[cls] || {};
       const dhuhaMap = appData.sholatAttendance?.[dateStr]?.Dhuha?.[cls] || {};
+      const gwNotesMap = appData.guruWaliNotes?.[dateStr]?.[cls] || {};
 
       const mapelRooms = appData.rooms.filter(r => !isEkskulRoom(r));
       let activeMapelCount = 0;
@@ -3416,17 +3818,18 @@
       });
       document.getElementById('hrActiveMapelBadge').textContent = `${activeMapelCount} Mapel Mengisi Absen`;
 
-      let pagiHadir = 0, dzuhurHadir = 0;
+      let pagiHadir = 0, dzuhurHadir = 0, pelanggaranCount = 0;
       list.forEach(s => {
         if (pagiMap[s.id]?.status === 'Hadir') pagiHadir++;
         if (dzuhurMap[s.id]?.status === 'Jamaah') dzuhurHadir++;
+        if (gwNotesMap[s.id]) pelanggaranCount++;
       });
 
       document.getElementById('hrStatsGrid').innerHTML = `
         <div class="stat-card"><div class="stat-label">Total Siswa</div><div class="stat-value">${list.length}</div></div>
         <div class="stat-card"><div class="stat-label">Hadir Pagi</div><div class="stat-value" style="color:var(--success);">${pagiHadir}</div></div>
         <div class="stat-card"><div class="stat-label">Sholat Dzuhur</div><div class="stat-value" style="color:var(--info);">${dzuhurHadir}</div></div>
-        <div class="stat-card"><div class="stat-label">Mapel Aktif</div><div class="stat-value">${activeMapelCount}</div></div>
+        <div class="stat-card"><div class="stat-label">Catatan Pelanggaran</div><div class="stat-value" style="color:var(--danger);">${pelanggaranCount}</div></div>
       `;
 
       document.getElementById('hrMatrixTableBody').innerHTML = list.map((s, i) => {
@@ -3435,15 +3838,19 @@
           const rSt = (appData.roomStudents[r.id] || []).find(rs => rs.name === s.name && rs.kelas === cls);
           if (rSt && appData.roomAttendance?.[r.id]?.[dateStr]?.[rSt.id]?.status === 'Hadir') hadirMapel++;
         });
+        const note = gwNotesMap[s.id] || '';
         return `
           <tr>
             <td>${i + 1}</td>
             <td class="mono">${s.nisn || s.id}</td>
             <td><strong>${s.name}</strong></td>
             <td>${pagiMap[s.id] ? `<span class="badge badge-success">${pagiMap[s.id].status} (${pagiMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
-            <td>${dzuhurMap[s.id] ? `<span class="badge badge-success">${dzuhurMap[s.id].status}</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
-            <td>${dhuhaMap[s.id] ? `<span class="badge badge-success">${dhuhaMap[s.id].status}</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
+            <td>${dzuhurMap[s.id] ? `<span class="badge ${dzuhurMap[s.id].status === 'Jamaah' ? 'badge-success' : 'badge-purple'}">${dzuhurMap[s.id].status} (${dzuhurMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
+            <td>${dhuhaMap[s.id] ? `<span class="badge ${dhuhaMap[s.id].status === 'Jamaah' ? 'badge-success' : 'badge-purple'}">${dhuhaMap[s.id].status} (${dhuhaMap[s.id].time})</span>` : '<span class="badge badge-teal">Belum</span>'}</td>
             <td><span class="badge badge-info">${hadirMapel} / ${mapelRooms.length} Mapel Hadir</span></td>
+            <td style="color:${note ? 'var(--danger)' : 'var(--text-muted)'}; font-weight:${note ? '700' : '400'};">
+              ${note ? `⚠️ ${note}` : 'Tertib'}
+            </td>
           </tr>
         `;
       }).join('');
@@ -3468,8 +3875,67 @@
       const list = appData.masterStudents[cls] || [];
       const pagiMap = appData.pagiAttendance?.[dateStr]?.[cls] || {};
       const dzuhurMap = appData.sholatAttendance?.[dateStr]?.Dzuhur?.[cls] || {};
-      const lines = ['No;NISN;Nama;Kelas;Absen Pagi;Sholat Dzuhur', ...list.map((s, i) => `${i + 1};${s.nisn || s.id};"${s.name}";${cls};${pagiMap[s.id]?.status || 'Belum'};${dzuhurMap[s.id]?.status || 'Belum'}`)];
-      downloadTextFile(`Laporan_WaliKelas_${cls}_${dateStr}.csv`, '\uFEFF' + lines.join('\n'), 'text/csv;charset=utf-8;');
+      const dhuhaMap = appData.sholatAttendance?.[dateStr]?.Dhuha?.[cls] || {};
+      const gwNotes = appData.guruWaliNotes?.[dateStr]?.[cls] || {};
+      const lines = [
+        'No;NISN;Nama;Kelas;Absen Pagi;Sholat Dzuhur;Sholat Dhuha;Catatan Pelanggaran Guru Wali',
+        ...list.map((s, i) => `${i + 1};${s.nisn || s.id};"${s.name}";${cls};${pagiMap[s.id]?.status || 'Belum'};${dzuhurMap[s.id]?.status || 'Belum'};${dhuhaMap[s.id]?.status || 'Belum'};"${gwNotes[s.id] || 'Tertib'}"`)
+      ];
+      downloadTextFile(`Laporan_Terpadu_${cls}_${dateStr}.csv`, '\uFEFF' + lines.join('\n'), 'text/csv;charset=utf-8;');
+    }
+
+    function downloadHomeroomExcel() {
+      const cls = currentSession.role === 'wali_kelas' ? currentSession.kelas : (document.getElementById('bkClassSelector')?.value || 'VIIA');
+      const dateStr = document.getElementById('hrDateInput')?.value || getTodayISO();
+      const list = appData.masterStudents[cls] || [];
+      const pagiMap = appData.pagiAttendance?.[dateStr]?.[cls] || {};
+      const dzuhurMap = appData.sholatAttendance?.[dateStr]?.Dzuhur?.[cls] || {};
+      const dhuhaMap = appData.sholatAttendance?.[dateStr]?.Dhuha?.[cls] || {};
+      const gwNotes = appData.guruWaliNotes?.[dateStr]?.[cls] || {};
+      const mapelRooms = appData.rooms.filter(r => !isEkskulRoom(r));
+
+      if (typeof XLSX === 'undefined') {
+        exportHomeroomCSV();
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      const aoa = [
+        ['LAPORAN TERPADU KEHADIRAN, SHOLAT & CATATAN PEMBINAAN SISWA'],
+        ['SMP NEGERI 1 TEMPURAN'],
+        [`Kelas: ${CLASS_LABELS[cls] || cls} | Tanggal: ${formatIndonesianDayDate(dateStr)}`],
+        [],
+        ['No', 'NISN', 'Nama Siswa', 'Kelas', 'Absen Pagi', 'Sholat Dzuhur', 'Sholat Dhuha', 'Kehadiran Mapel', 'Catatan Pelanggaran (Guru Wali)']
+      ];
+
+      list.forEach((s, i) => {
+        let hadirMapel = 0;
+        mapelRooms.forEach(r => {
+          const rSt = (appData.roomStudents[r.id] || []).find(rs => rs.name === s.name && rs.kelas === cls);
+          if (rSt && appData.roomAttendance?.[r.id]?.[dateStr]?.[rSt.id]?.status === 'Hadir') hadirMapel++;
+        });
+        aoa.push([
+          i + 1,
+          s.nisn || s.id,
+          s.name,
+          cls,
+          pagiMap[s.id] ? `${pagiMap[s.id].status} (${pagiMap[s.id].time})` : 'Belum',
+          dzuhurMap[s.id] ? `${dzuhurMap[s.id].status} (${dzuhurMap[s.id].time})` : 'Belum',
+          dhuhaMap[s.id] ? `${dhuhaMap[s.id].status} (${dhuhaMap[s.id].time})` : 'Belum',
+          `${hadirMapel} / ${mapelRooms.length} Mapel`,
+          gwNotes[s.id] || 'Tertib'
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [
+        { wch: 5 }, { wch: 15 }, { wch: 28 }, { wch: 10 },
+        { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 42 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, `Laporan_${cls}`);
+      const filename = `Laporan_WaliKelas_BK_${cls}_${dateStr}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showToast('success', 'Excel Berhasil Diunduh', `File ${filename} siap dibuka di Excel.`);
     }
 
     /* =========================================================================
